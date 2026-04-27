@@ -33,6 +33,7 @@ import sys
 import time
 import re
 import os
+import json
 import subprocess
 import webbrowser
 import logging
@@ -488,6 +489,15 @@ class WIZWindow(QMainWindow, main_window):
         # CSV 경로 기억 (Save/Load Searched Results) - config/ui_state.json에서 로드
         self.last_csv_directory = self.csv_mru_manager.get_last_directory()
 
+        # FW from Git
+        try:
+            from fw_git_fetcher import FWGitFetcher
+            self._fw_fetcher = FWGitFetcher(resource_path("config/fw_sources.json"))
+        except Exception as e:
+            self.logger.warning(f"FWGitFetcher init failed: {e}")
+            self._fw_fetcher = None
+        self._fw_download_path = self._load_fw_download_path()
+
         # check if use setting password
         self.use_setting_pw = False
         # self.entered_set_pw = ''  # setting pw bak
@@ -580,7 +590,7 @@ class WIZWindow(QMainWindow, main_window):
             self.btn_loadconfig.clicked.connect(self.dialog_load_file)
 
             # self.btn_upload.clicked.connect(self.update_btn_clicked)
-            self.btn_upload.clicked.connect(self.event_upload_clicked)
+            # btn_upload uses setMenu() in init_ui_object() — clicked handled by menu actions
             self.btn_exit.clicked.connect(self.msg_exit)
         except Exception as e:
             self.logger.error(f"button event register error: {e}")
@@ -657,6 +667,10 @@ class WIZWindow(QMainWindow, main_window):
         self._action_terminal.triggered.connect(self._toggle_terminal)
         self.menuOption.addSeparator()
         self.menuOption.addAction(self._action_terminal)
+
+        self._action_fw_dl_path = QAction("FW 다운로드 경로...", self)
+        self._action_fw_dl_path.triggered.connect(self.event_set_fw_download_path)
+        self.menuOption.addAction(self._action_fw_dl_path)
 
         self.actionSave.triggered.connect(self.dialog_save_file)
         self.actionLoad.triggered.connect(self.dialog_load_file)
@@ -866,6 +880,14 @@ class WIZWindow(QMainWindow, main_window):
         #     lineedit_subtopic = getattr(self, f'lineedit_mqtt_subtopic_{i}')
         #     # lineedit_subtopic.hide()
         #     lineedit_subtopic.setEnabled(False)
+
+        # btn_upload → 드롭다운 메뉴 (FW from local PC / FW from Git)
+        upload_menu = QMenu(self)
+        self._act_fw_local = upload_menu.addAction("FW from local PC")
+        self._act_fw_git   = upload_menu.addAction("FW from Git")
+        self.btn_upload.setMenu(upload_menu)
+        self._act_fw_local.triggered.connect(self.event_upload_clicked)
+        self._act_fw_git.triggered.connect(self.event_fw_from_git)
 
     def init_btn_factory(self):
         # factory_option = ['Factory default settings', 'Factory default firmware']
@@ -4872,6 +4894,90 @@ class WIZWindow(QMainWindow, main_window):
             self.msg_connection_failed()
         elif error == -3:
             self.statusbar.showMessage(" Certificate update error.")
+
+    # ── FW from Git ───────────────────────────────────────────────────────────
+    def _load_fw_download_path(self) -> str:
+        try:
+            cfg = os.path.join("config", "ui_state.json")
+            if os.path.exists(cfg):
+                with open(cfg, encoding="utf-8") as f:
+                    state = json.load(f)
+                p = state.get("fw", {}).get("download_path", "")
+                if p:
+                    return p
+        except Exception:
+            pass
+        from pathlib import Path
+        return str(Path.home() / "Downloads")
+
+    def _save_fw_download_path(self, path: str):
+        cfg = os.path.join("config", "ui_state.json")
+        try:
+            state = {}
+            if os.path.exists(cfg):
+                with open(cfg, encoding="utf-8") as f:
+                    state = json.load(f)
+            state.setdefault("fw", {})["download_path"] = path
+            os.makedirs("config", exist_ok=True)
+            with open(cfg, "w", encoding="utf-8") as f:
+                json.dump(state, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            self.logger.error(f"FW download path save failed: {e}")
+
+    def event_set_fw_download_path(self):
+        path = QFileDialog.getExistingDirectory(
+            self, "FW 다운로드 경로 선택", self._fw_download_path
+        )
+        if path:
+            self._fw_download_path = path
+            self._save_fw_download_path(path)
+
+    def event_fw_from_git(self):
+        if not self.curr_dev:
+            self.show_msgbox("Warning", "장치를 먼저 선택하세요.", QMessageBox.Warning)
+            return
+        if self._fw_fetcher is None:
+            self.show_msgbox(
+                "Warning",
+                "FW from Git 설정 파일(fw_sources.json)을 불러오지 못했습니다.",
+                QMessageBox.Warning,
+            )
+            return
+
+        family, device_spec = self._fw_fetcher.find_device(self.curr_dev)
+        if family is None:
+            supported = "\n".join(
+                f"  • {p}" for p in self._fw_fetcher.supported_devices()
+            )
+            self.show_msgbox(
+                "Warning",
+                f"'{self.curr_dev}'는 FW from Git 미지원 장치입니다.\n\n지원 장치:\n{supported}",
+                QMessageBox.Warning,
+            )
+            return
+
+        from fw_git_dialog import FWGitDialog
+        dlg = FWGitDialog(
+            self, self.curr_dev, family, device_spec,
+            self._fw_fetcher, self._fw_download_path
+        )
+        dlg.firmware_ready.connect(self._on_fw_git_ready)
+        dlg.exec_()
+
+    def _on_fw_git_ready(self, filepath: str, filesize: int):
+        if self.localip_addr is None:
+            self.show_msgbox(
+                "Warning",
+                "Local IP information could not be found. Check the Network configuration.",
+                QMessageBox.Warning,
+            )
+            return
+        # WIZ107/108SR 특수 케이스 (firmware_file_open()과 동일)
+        if self.curr_dev and (
+            "WIZ107" in self.curr_dev or "WIZ108" in self.curr_dev
+        ):
+            filesize = 51 * 1024
+        self.firmware_update(filepath, filesize)
 
     # 'FW': firmware upload
     def firmware_update(self, filename, filesize):
