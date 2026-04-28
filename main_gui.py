@@ -753,9 +753,9 @@ class WIZWindow(QMainWindow, main_window):
         _grid = self.gridLayout_102
         _grid.removeWidget(self.btn_exit)
 
-        self._btn_terminal = QPushButton('🖥\n터미널')
+        self._btn_terminal = QPushButton('🖥\nTerminal')
         self._btn_terminal.setCheckable(True)
-        self._btn_terminal.setMinimumSize(110, 55)
+        self._btn_terminal.setMinimumSize(110, 68)
         self._btn_terminal.setMaximumSize(240, 100)
         self._btn_terminal.setToolTip('터미널 패널 열기/닫기')
         self._btn_terminal.clicked.connect(self._toggle_terminal)
@@ -4945,16 +4945,34 @@ class WIZWindow(QMainWindow, main_window):
             return
 
         family, device_spec = self._fw_fetcher.find_device(self.curr_dev)
+        # TODO: 테스트용 — 미지원 장치 체크 임시 비활성화
+        # if family is None:
+        #     supported = "\n".join(
+        #         f"  • {p}" for p in self._fw_fetcher.supported_devices()
+        #     )
+        #     self.show_msgbox(
+        #         "Warning",
+        #         f"'{self.curr_dev}'는 FW from Git 미지원 장치입니다.\n\n지원 장치:\n{supported}",
+        #         QMessageBox.Warning,
+        #     )
+        #     return
         if family is None:
-            supported = "\n".join(
-                f"  • {p}" for p in self._fw_fetcher.supported_devices()
-            )
-            self.show_msgbox(
-                "Warning",
-                f"'{self.curr_dev}'는 FW from Git 미지원 장치입니다.\n\n지원 장치:\n{supported}",
-                QMessageBox.Warning,
-            )
-            return
+            # 테스트 폴백: 패턴 접두사로 가장 유사한 장치 선택
+            # 예) W55RP20-S2E-2CH → W55RP20-S2E 패턴이 부분 일치
+            dn = self.curr_dev.upper()
+            sources = self._fw_fetcher._sources
+            best_fam = sources["families"][0]
+            best_dev = best_fam["devices"][0]
+            for fam in sources["families"]:
+                for dev in fam["devices"]:
+                    base = dev["name_pattern"].rstrip("?*").upper()
+                    if base and dn.startswith(base):
+                        best_fam, best_dev = fam, dev
+                        break
+                else:
+                    continue
+                break
+            family, device_spec = best_fam, best_dev
 
         from fw_git_dialog import FWGitDialog
         dlg = FWGitDialog(

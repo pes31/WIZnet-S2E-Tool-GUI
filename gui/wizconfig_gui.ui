@@ -9807,7 +9807,7 @@ interval</string>
             <property name="minimumSize">
              <size>
               <width>110</width>
-              <height>55</height>
+              <height>68</height>
              </size>
             </property>
             <property name="maximumSize">
@@ -9876,7 +9876,7 @@ Search</string>
             <property name="minimumSize">
              <size>
               <width>110</width>
-              <height>55</height>
+              <height>68</height>
              </size>
             </property>
             <property name="maximumSize">
@@ -9927,7 +9927,7 @@ Settings</string>
             <property name="minimumSize">
              <size>
               <width>110</width>
-              <height>55</height>
+              <height>68</height>
              </size>
             </property>
             <property name="maximumSize">
@@ -9978,7 +9978,7 @@ Upload</string>
             <property name="minimumSize">
              <size>
               <width>110</width>
-              <height>55</height>
+              <height>68</height>
              </size>
             </property>
             <property name="maximumSize">
@@ -10041,7 +10041,7 @@ Device</string>
             <property name="minimumSize">
              <size>
               <width>110</width>
-              <height>55</height>
+              <height>68</height>
              </size>
             </property>
             <property name="maximumSize">
@@ -10089,10 +10089,10 @@ Reset</string>
              <bool>false</bool>
             </property>
             <property name="popupMode">
-             <enum>QToolButton::MenuButtonPopup</enum>
+             <enum>QToolButton::InstantPopup</enum>
             </property>
             <property name="toolButtonStyle">
-             <enum>Qt::ToolButtonTextBesideIcon</enum>
+             <enum>Qt::ToolButtonTextUnderIcon</enum>
             </property>
             <property name="autoRaise">
              <bool>false</bool>
@@ -10135,10 +10135,16 @@ Reset</string>
             <property name="enabled">
              <bool>false</bool>
             </property>
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
             <property name="minimumSize">
              <size>
               <width>110</width>
-              <height>55</height>
+              <height>68</height>
              </size>
             </property>
             <property name="maximumSize">
@@ -10150,7 +10156,7 @@ Reset</string>
             <property name="font">
              <font>
               <family>맑은 고딕</family>
-              <pointsize>9</pointsize>
+              <pointsize>10</pointsize>
               <weight>50</weight>
               <italic>false</italic>
               <bold>false</bold>
@@ -10165,8 +10171,8 @@ Config</string>
             </property>
             <property name="iconSize">
              <size>
-              <width>20</width>
-              <height>20</height>
+              <width>40</width>
+              <height>40</height>
              </size>
             </property>
            </widget>
@@ -10176,10 +10182,16 @@ Config</string>
             <property name="enabled">
              <bool>false</bool>
             </property>
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
             <property name="minimumSize">
              <size>
               <width>110</width>
-              <height>55</height>
+              <height>68</height>
              </size>
             </property>
             <property name="maximumSize">
@@ -10206,8 +10218,8 @@ Config</string>
             </property>
             <property name="iconSize">
              <size>
-              <width>20</width>
-              <height>20</height>
+              <width>40</width>
+              <height>40</height>
              </size>
             </property>
            </widget>
@@ -10234,10 +10246,16 @@ Config</string>
           <property name="enabled">
            <bool>true</bool>
           </property>
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
           <property name="minimumSize">
            <size>
             <width>110</width>
-            <height>55</height>
+            <height>68</height>
            </size>
           </property>
           <property name="maximumSize">
