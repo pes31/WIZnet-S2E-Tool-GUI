@@ -759,6 +759,9 @@ class WIZWindow(QMainWindow, main_window):
         self._btn_terminal.setIcon(QApplication.style().standardIcon(QStyle.SP_ComputerIcon))
         self._btn_terminal.setText('Terminal')
         self._btn_terminal.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
+        self._btn_terminal.setSizePolicy(
+            QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed
+        )
         self._btn_terminal.setCheckable(True)
         self._btn_terminal.setMinimumSize(85, 62)
         self._btn_terminal.setMaximumSize(240, 100)
@@ -768,6 +771,11 @@ class WIZWindow(QMainWindow, main_window):
         self._btn_terminal.clicked.connect(self._toggle_terminal)
         _grid.addWidget(self._btn_terminal, 0, 4)
         # _grid.addWidget(self.btn_exit, 0, 5)  # Exit 버튼 툴바에서 숨김
+
+        # 버튼 수 비례로 컬럼 폭 배분 → 버튼 1개당 동일한 너비
+        _grid.setColumnStretch(0, 5)  # Group1: btn_search/setting/upload/reset/factory
+        _grid.setColumnStretch(2, 2)  # Group2: btn_saveconfig/loadconfig
+        _grid.setColumnStretch(4, 1)  # Terminal
 
         self._terminal_panel.panel_hidden.connect(self._on_terminal_panel_hidden)
 
