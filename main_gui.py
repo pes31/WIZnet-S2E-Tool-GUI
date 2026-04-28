@@ -62,6 +62,8 @@ from PyQt5.QtWidgets import (
     # QGridLayout,
     QToolTip,
     QPushButton,
+    QToolButton,
+    QStyle,
     # QRadioButton,
     # QComboBox,
     # QCheckBox,
@@ -591,7 +593,7 @@ class WIZWindow(QMainWindow, main_window):
 
             # self.btn_upload.clicked.connect(self.update_btn_clicked)
             # btn_upload uses setMenu() in init_ui_object() — clicked handled by menu actions
-            self.btn_exit.clicked.connect(self.msg_exit)
+            # self.btn_exit.clicked.connect(self.msg_exit)  # Exit 버튼 툴바에서 숨김
         except Exception as e:
             self.logger.error(f"button event register error: {e}")
 
@@ -751,16 +753,21 @@ class WIZWindow(QMainWindow, main_window):
         # 메인 툴바(gridLayout_102)에 터미널 버튼 삽입 — btn_exit 왼쪽
         # btn_exit: row=0, col=4 in gridLayout_102
         _grid = self.gridLayout_102
-        _grid.removeWidget(self.btn_exit)
+        # _grid.removeWidget(self.btn_exit)  # Exit 버튼 툴바에서 숨김
 
-        self._btn_terminal = QPushButton('🖥\nTerminal')
+        self._btn_terminal = QToolButton()
+        self._btn_terminal.setIcon(QApplication.style().standardIcon(QStyle.SP_ComputerIcon))
+        self._btn_terminal.setText('Terminal')
+        self._btn_terminal.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
         self._btn_terminal.setCheckable(True)
-        self._btn_terminal.setMinimumSize(110, 68)
+        self._btn_terminal.setMinimumSize(85, 62)
         self._btn_terminal.setMaximumSize(240, 100)
+        self._btn_terminal.setIconSize(QtCore.QSize(32, 32))
+        self._btn_terminal.setFont(self.midfont)
         self._btn_terminal.setToolTip('터미널 패널 열기/닫기')
         self._btn_terminal.clicked.connect(self._toggle_terminal)
         _grid.addWidget(self._btn_terminal, 0, 4)
-        _grid.addWidget(self.btn_exit, 0, 5)
+        # _grid.addWidget(self.btn_exit, 0, 5)  # Exit 버튼 툴바에서 숨김
 
         self._terminal_panel.panel_hidden.connect(self._on_terminal_panel_hidden)
 
@@ -5751,7 +5758,7 @@ class WIZWindow(QMainWindow, main_window):
             QtGui.QPixmap(resource_path(iconfile)), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off
         )
         button.setIcon(icon)
-        button.setIconSize(QtCore.QSize(40, 40))
+        button.setIconSize(QtCore.QSize(32, 32))
         button.setFont(self.midfont)
 
     def set_btn_icon(self):
@@ -5762,7 +5769,7 @@ class WIZWindow(QMainWindow, main_window):
         self.config_button_icon("gui/upload_48.ico", "btn_upload")
         self.config_button_icon("gui/reset_48.ico", "btn_reset")
         self.config_button_icon("gui/factory_48.ico", "btn_factory")
-        self.config_button_icon("gui/exit_48.ico", "btn_exit")
+        # self.config_button_icon("gui/exit_48.ico", "btn_exit")  # Exit 버튼 툴바에서 숨김
 
     def font_init(self):
         self.midfont = QtGui.QFont()
