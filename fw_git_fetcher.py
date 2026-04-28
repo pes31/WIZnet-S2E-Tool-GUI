@@ -2,6 +2,7 @@
 GitHub 릴리즈에서 펌웨어를 조회·다운로드·추출하는 유틸리티.
 GUI 의존 없는 순수 로직 모듈.
 """
+import datetime
 import fnmatch
 import json
 import os
@@ -80,7 +81,8 @@ class FWGitFetcher:
         extract_file="App_linker.bin" → zip 에서 해당 파일 추출
         """
         os.makedirs(dest_dir, exist_ok=True)
-        asset_path = os.path.join(dest_dir, asset["name"])
+        ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        asset_path = os.path.join(dest_dir, f"fwgit_{ts}_{asset['name']}")
 
         resp = requests.get(
             asset["browser_download_url"], stream=True, timeout=60
@@ -99,11 +101,13 @@ class FWGitFetcher:
                 (n for n in names if Path(n).name == extract_file), None
             )
             if match is None:
+                os.remove(asset_path)
                 raise FileNotFoundError(
                     f"{extract_file} not found in zip ({asset['name']})"
                 )
-            bin_path = os.path.join(dest_dir, extract_file)
+            bin_path = os.path.join(dest_dir, f"fwgit_{ts}_{extract_file}")
             with zf.open(match) as src, open(bin_path, "wb") as dst:
                 dst.write(src.read())
 
+        os.remove(asset_path)   # zip 추출 후 즉시 삭제
         return bin_path, os.path.getsize(bin_path)

@@ -1,7 +1,9 @@
 """
-GitHub 릴리즈 목록 조회 → 선택 → 다운로드·추출 다이얼로그.
-완료 시 firmware_ready(bin_path, filesize) 시그널 emit 후 자동 닫힘.
+GitHub release list → select → download/extract dialog.
+Emits firmware_ready(bin_path, filesize) signal on completion, then auto-closes.
 """
+import os
+
 from PyQt5.QtCore import QThread, pyqtSignal
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QGridLayout,
@@ -61,6 +63,7 @@ class FWGitDialog(QDialog):
         self._current_asset = None
         self._fetch_thread = None
         self._dl_thread = None
+        self._tmp_bin_path = None
 
         self.setWindowTitle("FW from Git")
         self.setFixedWidth(540)
@@ -68,90 +71,90 @@ class FWGitDialog(QDialog):
         self._build_ui()
         self._start_fetch()
 
-    # ── UI 구성 ──────────────────────────────────────────────────────
+    # ── UI ───────────────────────────────────────────────────────────
     def _build_ui(self):
         root = QVBoxLayout(self)
         root.setSpacing(8)
         root.setContentsMargins(12, 12, 12, 12)
 
-        # 장치 / 저장소 정보
+        # Device / repository info
         grid = QGridLayout()
         grid.setColumnStretch(1, 1)
-        grid.addWidget(QLabel("장치:"), 0, 0)
+        grid.addWidget(QLabel("Device:"), 0, 0)
         grid.addWidget(QLabel(
             f"<b>{self._device_name}</b>  "
             f"<span style='color:gray'>({self._family['repo']})</span>"
         ), 0, 1)
 
-        # 릴리즈 선택 행
-        grid.addWidget(QLabel("릴리즈:"), 1, 0)
+        # Release selection row
+        grid.addWidget(QLabel("Release:"), 1, 0)
         rel_row = QHBoxLayout()
         self._combo = QComboBox()
         self._combo.setMinimumWidth(260)
         self._combo.currentIndexChanged.connect(self._update_asset_label)
         rel_row.addWidget(self._combo, 1)
-        self._btn_refresh = QPushButton("새로고침")
+        self._btn_refresh = QPushButton("Refresh")
         self._btn_refresh.setFixedWidth(80)
         self._btn_refresh.clicked.connect(self._start_fetch)
         rel_row.addWidget(self._btn_refresh)
         grid.addLayout(rel_row, 1, 1)
 
-        # 에셋 행
-        grid.addWidget(QLabel("에셋:"), 2, 0)
+        # Asset row
+        grid.addWidget(QLabel("Asset:"), 2, 0)
         self._lbl_asset = QLabel("—")
         self._lbl_asset.setWordWrap(True)
         grid.addWidget(self._lbl_asset, 2, 1)
 
         root.addLayout(grid)
 
-        # 구분선
+        # Separator
         sep1 = QFrame()
         sep1.setFrameShape(QFrame.HLine)
         sep1.setFrameShadow(QFrame.Sunken)
         root.addWidget(sep1)
 
-        # 다운로드 경로 행
+        # Download path row
         path_row = QHBoxLayout()
-        path_row.addWidget(QLabel("저장 경로:"))
+        path_row.addWidget(QLabel("Save Path:"))
         self._lbl_dlpath = QLabel(self._dl_path)
         self._lbl_dlpath.setWordWrap(True)
         path_row.addWidget(self._lbl_dlpath, 1)
-        btn_change = QPushButton("변경")
-        btn_change.setFixedWidth(60)
+        btn_change = QPushButton("Browse...")
+        btn_change.setFixedWidth(70)
         btn_change.clicked.connect(self._change_dl_path)
         path_row.addWidget(btn_change)
         root.addLayout(path_row)
 
-        # 구분선
+        # Separator
         sep2 = QFrame()
         sep2.setFrameShape(QFrame.HLine)
         sep2.setFrameShadow(QFrame.Sunken)
         root.addWidget(sep2)
 
-        # 진행 바 (기본 숨김)
+        # Progress bar (hidden by default)
         self._pgbar = QProgressBar()
         self._pgbar.setRange(0, 0)   # indeterminate
         self._pgbar.setVisible(False)
         root.addWidget(self._pgbar)
 
-        # 하단 버튼 행
+        # Bottom button row
         btn_row = QHBoxLayout()
         btn_row.addStretch()
-        self._btn_dl = QPushButton("다운로드 & 업로드")
+        self._btn_dl = QPushButton("Download")
         self._btn_dl.setEnabled(False)
         self._btn_dl.setDefault(True)
         self._btn_dl.clicked.connect(self._on_download)
         btn_row.addWidget(self._btn_dl)
-        btn_cancel = QPushButton("취소")
+        btn_cancel = QPushButton("Cancel")
         btn_cancel.clicked.connect(self.reject)
         btn_row.addWidget(btn_cancel)
         root.addLayout(btn_row)
 
-    # ── 릴리즈 조회 ─────────────────────────────────────────────────
+    # ── Fetch releases ───────────────────────────────────────────────
     def _start_fetch(self):
         self._set_busy(True)
         self._combo.clear()
-        self._lbl_asset.setText("목록 조회 중...")
+        self._lbl_asset.setText("Fetching releases...")
         self._lbl_asset.setStyleSheet("")
         self._releases = []
         self._current_asset = None
@@ -172,13 +175,13 @@ class FWGitDialog(QDialog):
         if releases:
             self._update_asset_label(0)
         else:
-            self._lbl_asset.setText("릴리즈가 없습니다.")
+            self._lbl_asset.setText("No releases found.")
 
     def _on_fetch_error(self, msg):
         self._set_busy(False)
-        self._lbl_asset.setText("조회 실패")
+        self._lbl_asset.setText("Fetch failed")
         self._lbl_asset.setStyleSheet("color: red;")
-        QMessageBox.critical(self, "오류", f"릴리즈 목록 조회 실패:\n{msg}")
+        QMessageBox.critical(self, "Error", f"Failed to fetch releases:\n{msg}")
 
     def _update_asset_label(self, index):
         if not self._releases or index < 0 or index >= len(self._releases):
@@ -189,16 +192,16 @@ class FWGitDialog(QDialog):
         asset = self._fetcher.find_asset(release, self._device_spec, self._family)
         self._current_asset = asset
         if asset:
-            extract = self._device_spec.get("extract_file") or "(직접 사용)"
+            extract = self._device_spec.get("extract_file") or "(direct use)"
             self._lbl_asset.setText(f"{asset['name']}  →  {extract}")
             self._lbl_asset.setStyleSheet("")
             self._btn_dl.setEnabled(True)
         else:
-            self._lbl_asset.setText("해당 릴리즈에 매칭 에셋 없음")
+            self._lbl_asset.setText("No matching asset for this release.")
             self._lbl_asset.setStyleSheet("color: red;")
             self._btn_dl.setEnabled(False)
 
-    # ── 다운로드 ─────────────────────────────────────────────────────
+    # ── Download ─────────────────────────────────────────────────────
     def _on_download(self):
         self._set_busy(True)
         extract_file = self._device_spec.get("extract_file")
@@ -214,21 +217,33 @@ class FWGitDialog(QDialog):
 
     def _on_download_done(self, path, size):
         self._set_busy(False)
+        self._tmp_bin_path = path
         self.firmware_ready.emit(path, size)
         self.accept()
 
     def _on_download_error(self, msg):
         self._set_busy(False)
-        QMessageBox.critical(self, "오류", f"다운로드 실패:\n{msg}")
+        self._cleanup_tmp()
+        QMessageBox.critical(self, "Error", f"Download failed:\n{msg}")
 
-    # ── 저장 경로 변경 ───────────────────────────────────────────────
+    def _cleanup_tmp(self):
+        if self._tmp_bin_path and os.path.isfile(self._tmp_bin_path):
+            try:
+                os.remove(self._tmp_bin_path)
+            except OSError:
+                pass
+        self._tmp_bin_path = None
+
+    # ── Save path ────────────────────────────────────────────────────
     def _change_dl_path(self):
-        path = QFileDialog.getExistingDirectory(self, "다운로드 저장 경로", self._dl_path)
+        path = QFileDialog.getExistingDirectory(
+            self, "Select Download Directory", self._dl_path
+        )
         if path:
             self._dl_path = path
             self._lbl_dlpath.setText(path)
 
-    # ── 헬퍼 ─────────────────────────────────────────────────────────
+    # ── Helpers ──────────────────────────────────────────────────────
     def _set_busy(self, busy: bool):
         self._pgbar.setVisible(busy)
         self._btn_refresh.setEnabled(not busy)

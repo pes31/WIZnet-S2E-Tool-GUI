@@ -593,7 +593,7 @@ class WIZWindow(QMainWindow, main_window):
 
             # self.btn_upload.clicked.connect(self.update_btn_clicked)
             # btn_upload uses setMenu() in init_ui_object() — clicked handled by menu actions
-            # self.btn_exit.clicked.connect(self.msg_exit)  # Exit 버튼 툴바에서 숨김
+            self.btn_exit.clicked.connect(self.msg_exit)
         except Exception as e:
             self.logger.error(f"button event register error: {e}")
 
@@ -753,7 +753,7 @@ class WIZWindow(QMainWindow, main_window):
         # 메인 툴바(gridLayout_102)에 터미널 버튼 삽입 — btn_exit 왼쪽
         # btn_exit: row=0, col=4 in gridLayout_102
         _grid = self.gridLayout_102
-        # _grid.removeWidget(self.btn_exit)  # Exit 버튼 툴바에서 숨김
+        _grid.removeWidget(self.btn_exit)
 
         self._btn_terminal = QToolButton()
         self._btn_terminal.setIcon(QApplication.style().standardIcon(QStyle.SP_ComputerIcon))
@@ -770,7 +770,7 @@ class WIZWindow(QMainWindow, main_window):
         self._btn_terminal.setToolTip('터미널 패널 열기/닫기')
         self._btn_terminal.clicked.connect(self._toggle_terminal)
         _grid.addWidget(self._btn_terminal, 0, 4)
-        # _grid.addWidget(self.btn_exit, 0, 5)  # Exit 버튼 툴바에서 숨김
+        _grid.addWidget(self.btn_exit, 0, 5)
 
         self._sync_toolbar_stretch(_grid)
 
@@ -5031,6 +5031,18 @@ class WIZWindow(QMainWindow, main_window):
         ):
             filesize = 51 * 1024
         self.firmware_update(filepath, filesize)
+        if self.t_fwup is not None:
+            _path = filepath
+            self.t_fwup.upload_result.connect(
+                lambda _, p=_path: self._cleanup_fw_git_file(p)
+            )
+
+    def _cleanup_fw_git_file(self, path: str):
+        if path and os.path.isfile(path):
+            try:
+                os.remove(path)
+            except OSError:
+                pass
 
     # 'FW': firmware upload
     def firmware_update(self, filename, filesize):
@@ -5797,7 +5809,7 @@ class WIZWindow(QMainWindow, main_window):
         self.config_button_icon("gui/upload_48.ico", "btn_upload")
         self.config_button_icon("gui/reset_48.ico", "btn_reset")
         self.config_button_icon("gui/factory_48.ico", "btn_factory")
-        # self.config_button_icon("gui/exit_48.ico", "btn_exit")  # Exit 버튼 툴바에서 숨김
+        self.config_button_icon("gui/exit_48.ico", "btn_exit")
 
     def font_init(self):
         self.midfont = QtGui.QFont()
