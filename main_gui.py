@@ -772,10 +772,7 @@ class WIZWindow(QMainWindow, main_window):
         _grid.addWidget(self._btn_terminal, 0, 4)
         # _grid.addWidget(self.btn_exit, 0, 5)  # Exit 버튼 툴바에서 숨김
 
-        # 버튼 수 비례로 컬럼 폭 배분 → 버튼 1개당 동일한 너비
-        _grid.setColumnStretch(0, 5)  # Group1: btn_search/setting/upload/reset/factory
-        _grid.setColumnStretch(2, 2)  # Group2: btn_saveconfig/loadconfig
-        _grid.setColumnStretch(4, 1)  # Terminal
+        self._sync_toolbar_stretch(_grid)
 
         self._terminal_panel.panel_hidden.connect(self._on_terminal_panel_hidden)
 
@@ -903,6 +900,29 @@ class WIZWindow(QMainWindow, main_window):
         self.btn_upload.setMenu(upload_menu)
         self._act_fw_local.triggered.connect(self.event_upload_clicked)
         self._act_fw_git.triggered.connect(self.event_fw_from_git)
+
+    def _sync_toolbar_stretch(self, grid):
+        """툴바 gridLayout의 컬럼별 버튼 수를 세어 columnStretch를 자동 배분.
+        버튼이 추가·제거될 때 다시 호출하면 비율이 자동 갱신된다."""
+        col_count = {}
+        for i in range(grid.count()):
+            item = grid.itemAt(i)
+            if item is None:
+                continue
+            _, col, _, _ = grid.getItemPosition(i)
+            widget = item.widget()
+            layout = item.layout()
+            if isinstance(widget, (QPushButton, QToolButton)):
+                col_count[col] = col_count.get(col, 0) + 1
+            elif layout is not None:
+                n = sum(
+                    1 for j in range(layout.count())
+                    if isinstance(layout.itemAt(j).widget(), (QPushButton, QToolButton))
+                )
+                if n:
+                    col_count[col] = col_count.get(col, 0) + n
+        for col, n in col_count.items():
+            grid.setColumnStretch(col, n)
 
     def init_btn_factory(self):
         # factory_option = ['Factory default settings', 'Factory default firmware']
