@@ -166,14 +166,15 @@ class TCPClientHandler(QThread):
         return sock
 
     def run(self):
+        disconnect_reason = 'stopped'
         while not self._stop_event.is_set():
             try:
                 sock = self._connect()
             except OSError as e:
                 self.error_occurred.emit(str(e))
                 if not self.auto_reconnect:
-                    self.disconnected.emit(str(e))
-                    return
+                    disconnect_reason = str(e)
+                    break
                 # 재연결 대기
                 self._stop_event.wait(self.reconnect_interval)
                 continue
@@ -205,7 +206,10 @@ class TCPClientHandler(QThread):
                         self.stats_updated.emit(self._tx, self._rx)
                         self.data_received.emit(data)
             except OSError as e:
-                self.disconnected.emit(str(e))
+                if self.auto_reconnect:
+                    self.disconnected.emit(str(e))
+                else:
+                    disconnect_reason = str(e)
             finally:
                 try:
                     sock.close()
@@ -216,7 +220,7 @@ class TCPClientHandler(QThread):
                 break
             self._stop_event.wait(self.reconnect_interval)
 
-        self.disconnected.emit('stopped')
+        self.disconnected.emit(disconnect_reason)
 
 
 # ──────────────────────────────────────────────────────────────

@@ -442,6 +442,7 @@ class TCPServerTab(BaseProtocolTab):
             self._do_listen()
 
     def _do_listen(self):
+        self.btn_listen.setEnabled(False)
         h = TCPServerHandler(self.spn_port.value())
         h.data_received.connect(lambda data, ip, port: self.display.append_rx(data))
         h.client_connected.connect(self._on_client_connected)
@@ -456,10 +457,12 @@ class TCPServerTab(BaseProtocolTab):
     def _on_status_changed(self, status: str):
         if status == 'listening':
             self.btn_listen.setText('Stop')
+            self.btn_listen.setEnabled(True)
             self.display.append_event(f'Listening on port {self.spn_port.value()}')
             self._set_connected(f':{self.spn_port.value()}')
         elif status in ('closed', 'error'):
             self.btn_listen.setText('Listen')
+            self.btn_listen.setEnabled(True)
             self.lbl_client.setText('Client: None')
             self.display.append_event('Server Stopped')
             self._set_disconnected()
