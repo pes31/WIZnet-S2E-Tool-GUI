@@ -282,6 +282,8 @@ class FWUploadThread(QThread):
                                         else:
                                             self.logger.error(f'[FW-4] FAIL: 장치 오류 응답 (ptr={self.curr_ptr})')
                                             self.client.close()
+                                            if self.timer1 is not None:
+                                                self.timer1.cancel()
                                             self.upload_result.emit(-1)
                                             self.terminate()
 
@@ -290,6 +292,8 @@ class FWUploadThread(QThread):
                                         self.istimeout = 0
                                         self.client.working_state = idle_state
                                         self.client.close()
+                                        if self.timer1 is not None:
+                                            self.timer1.cancel()
                                         self.upload_result.emit(-1)
                                         self.terminate()
 
@@ -322,7 +326,8 @@ class FWUploadThread(QThread):
             self.error_flag.emit(-3)
             self.logger.error(f'[FW] 예외 발생: {e}')
         finally:
-            pass
+            if self.timer1 is not None:
+                self.timer1.cancel()
 
     def sock_close(self):
         # 기존 연결 fin
@@ -335,7 +340,7 @@ class FWUploadThread(QThread):
     def tcpConnection(self, serverip, port):
         retrynum = 0
         self.tcp_sock = TCPClient(2, serverip, port)
-        print('sock state: %r' % (self.tcp_sock.state))
+        self.logger.debug('sock state: %r' % (self.tcp_sock.state))
 
         while True:
             if retrynum > 6:
