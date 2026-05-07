@@ -386,23 +386,23 @@ class ClickableInfoLabel(QLabel):
         - hideText() + 딜레이 + showText() 패턴이 안정적으로 동작
         - 호버 툴팁과 클릭 툴팁이 충돌하지 않도록 조정
         """
-        print("[DEBUG] ClickableInfoLabel.mousePressEvent called")
+        logger.debug("ClickableInfoLabel.mousePressEvent called")
         if ev and ev.button() == QtCore.Qt.MouseButton(1):  # 왼쪽 버튼만
             tooltip_text = self.toolTip()
-            print(f"[DEBUG] Tooltip text: {tooltip_text}")
+            logger.debug(f"Tooltip text: {tooltip_text}")
             if tooltip_text:
                 # 1단계: 기존 툴팁 숨기기 (호버 툴팁 제거)
                 QToolTip.hideText()
-                print("[DEBUG] hideText() called")
+                logger.debug("hideText() called")
 
                 # 2단계: 클릭 위치 계산 (글로벌 좌표계)
                 pos = self.mapToGlobal(ev.pos())
-                print(f"[DEBUG] Tooltip position: {pos}")
+                logger.debug(f"Tooltip position: {pos}")
 
                 # 3단계: 100ms 딜레이 후 툴팁 표시
                 # → Qt 내부에서 hideText() 처리 완료 대기
                 QtCore.QTimer.singleShot(100, lambda: self._show_tooltip_delayed(pos, tooltip_text))
-                print("[DEBUG] Timer scheduled for delayed tooltip")
+                logger.debug("Timer scheduled for delayed tooltip")
 
         # 부모 클래스의 이벤트 처리도 실행 (이벤트 전파)
         super().mousePressEvent(ev)
@@ -418,14 +418,13 @@ class ClickableInfoLabel(QLabel):
             - QTimer.singleShot()에서 호출됨
             - hideText() 이후 충분한 시간 경과 후 실행
         """
-        print("[DEBUG] _show_tooltip_delayed called")
+        logger.debug("_show_tooltip_delayed called")
         QToolTip.showText(pos, text, self, self.rect(), UITooltipSettings.TOOLTIP_DURATION_MS)
-        print(f"[DEBUG] showText() executed with duration={UITooltipSettings.TOOLTIP_DURATION_MS}ms")
+        logger.debug(f"showText() executed with duration={UITooltipSettings.TOOLTIP_DURATION_MS}ms")
 
 
 # VERSION = 'V1.5.5.1'  # github 이슈 #36 수정
 VERSION = f'V{Path(resource_path("version")).read_text().strip()}'
-print(f"VERSION={VERSION}")
 
 
 # Load ui files
@@ -813,7 +812,7 @@ class WIZWindow(QMainWindow, main_window):
                 ),
             }
         except Exception as e:
-            print(f"ERROR:init_ui_object:{e}")
+            self.logger.error(f"init_ui_object: {e}")
 
         # Initial tab — 높은 인덱스부터 제거
         self.generalTab.removeTab(6)
@@ -1102,7 +1101,7 @@ class WIZWindow(QMainWindow, main_window):
         self.btn_loadconfig.setEnabled(False)
 
         self.generalTab.setEnabled(False)
-        print("disable_object::channel_tab set tab disabled")
+        self.logger.debug("disable_object::channel_tab set tab disabled")
         self.channel_tab.setEnabled(False)
 
     def object_config(self):
@@ -1131,10 +1130,10 @@ class WIZWindow(QMainWindow, main_window):
         self.exp_gpio.setEnabled(True)
 
         if self.curr_st not in DeviceStatusMinimum:
-            print("object_config::channel_tab set tab enabled")
+            self.logger.debug("object_config::channel_tab set tab enabled")
             self.channel_tab.setEnabled(True)
         else:
-            print("object_config::channel_tab set tab disabled")
+            self.logger.debug("object_config::channel_tab set tab disabled")
             self.channel_tab.setEnabled(False)
         self.event_passwd_enable()
 
@@ -1374,7 +1373,7 @@ class WIZWindow(QMainWindow, main_window):
             self.groupbox_ch1_timeout_2.setEnabled(False)
 
         # WIZ5XX 가 아니면 modbus 는 사용 불가 #36
-        print(
+        self.logger.debug(
             f"model={self.curr_dev},ver={self.curr_ver},version compare={version_compare(self.curr_ver, '1.0.8')},status={self.curr_st}"
         )
         if self.curr_st in DeviceStatusMinimum:
@@ -1652,13 +1651,13 @@ class WIZWindow(QMainWindow, main_window):
             return
         # General tab ui setup by device
         n_tabs: int = self.generalTab.count()
-        print(f"n_tabs={n_tabs}")
+        self.logger.debug(f"n_tabs={n_tabs}")
         # 탭 인덱스(순서)와 이름을 구해 역순으로 정렬
         list_tabs: list = []
         for _i, _t in enumerate(range(n_tabs)):
             list_tabs.append(SysTabIndex(_i, self.generalTab.widget(_t).objectName()))
         list_tabs.sort(reverse=True)
-        print("list_tabs=", list_tabs)
+        self.logger.debug(f"list_tabs={list_tabs}")
         if self.curr_dev in SECURITY_DEVICE:
             # print(f"tabs in generalTab({self.generalTab}) has {self.generalTab.count()} tabs")
             # self.generalTab.count() 가 탭 추가/삭제하는 과정에서 신뢰불가.
@@ -1679,7 +1678,7 @@ class WIZWindow(QMainWindow, main_window):
                 for _new_tab in ExcludeTabInMinimum:
                     if _new_tab not in repr(list_tabs):
                         _new_tab_object = self.tab_structure.get(_new_tab)
-                        print(f"_new_tab={_new_tab},_new_tab_object={_new_tab_object}")
+                        self.logger.debug(f"_new_tab={_new_tab},_new_tab_object={_new_tab_object}")
                         if _new_tab_object is None:
                             continue
                         self.generalTab.insertTab(
@@ -1695,9 +1694,9 @@ class WIZWindow(QMainWindow, main_window):
             #     print(f"tab({_t}): name={self.generalTab.widget(_t).objectName()},obj={self.generalTab.widget(_t)}")
         else:
             # 빼야할 탭 빼기
-            print("list_tabs=", list_tabs)
+            self.logger.debug(f"list_tabs={list_tabs}")
             for _tab in list_tabs:
-                print("tab=", _tab)
+                self.logger.debug(f"tab={_tab}")
                 if _tab.name in ExcludeTabInCommon:
                     self.generalTab.removeTab(_tab.idx)
                     list_tabs.remove(_tab)
@@ -1783,7 +1782,7 @@ class WIZWindow(QMainWindow, main_window):
         if not self.curr_dev:
             return
         # channel tab config
-        print("channel_tab_config::curr_st=", self.curr_st)
+        self.logger.debug(f"channel_tab_config::curr_st={self.curr_st}")
         if self.curr_st in DeviceStatusMinimum:
             n_tabs = self.channel_tab.count()
             for i in reversed(range(1, n_tabs + 1)):
@@ -1797,16 +1796,16 @@ class WIZWindow(QMainWindow, main_window):
         ):
             if self.curr_dev in SECURITY_TWO_PORT_DEV:
                 self.channel_tab.insertTab(1, self.tab_ch1, self.ch1_tab_text)
-                print("channel_tab_config::channel_tab set tab enabled security 2port")
+                self.logger.debug("channel_tab_config::channel_tab set tab enabled security 2port")
                 self.channel_tab.setTabEnabled(0, True)
                 self.channel_tab.setTabEnabled(1, True)
                 return
             self.channel_tab.removeTab(1)
-            print("channel_tab_config::channel_tab set tab enabled 1port")
+            self.logger.debug("channel_tab_config::channel_tab set tab enabled 1port")
             self.channel_tab.setTabEnabled(0, True)
         elif self.curr_dev in TWO_PORT_DEV or "WIZ752" in self.curr_dev:
             self.channel_tab.insertTab(1, self.tab_ch1, self.ch1_tab_text)
-            print("channel_tab_config::channel_tab set tab enabled 2port")
+            self.logger.debug("channel_tab_config::channel_tab set tab enabled 2port")
             self.channel_tab.setTabEnabled(0, True)
             self.channel_tab.setTabEnabled(1, True)
 
@@ -3275,7 +3274,7 @@ class WIZWindow(QMainWindow, main_window):
         try:
             self.object_config()
         except Exception as e:
-            print(f"ERROR:::get_clicked_devinfo:object_config:{e}")
+            self.logger.error(f"get_clicked_devinfo:object_config:{e}")
 
         # print(f"2nd caller={call_from}")
         if self.curr_st == DeviceStatus.upgrade and call_from is None:
@@ -3287,26 +3286,24 @@ class WIZWindow(QMainWindow, main_window):
         # device profile(json format)
         if macaddr in self.dev_profile:
             dev_data = self.dev_profile[macaddr]
-            print("clicked device information:", dev_data)
-            print(f"[DEBUG] SD in dev_data: {'SD' in dev_data}")
+            self.logger.debug(f"clicked device information: {dev_data}")
+            self.logger.debug(f"SD in dev_data: {'SD' in dev_data}")
             if 'SD' in dev_data:
-                print(f"[DEBUG] SD value: '{dev_data['SD']}'")
+                self.logger.debug(f"SD value: '{dev_data['SD']}'")
             else:
-                print("[DEBUG] SD not found in dev_data")
+                self.logger.debug("SD not found in dev_data")
             if "ST" in dev_data and dev_data["ST"] in DeviceStatusMinimum:
-                print("get_clicked_devinfo::I'm in!!")
-                print(f"ch1_status={self.ch1_status}")
-                print("get_clicked_devinfo::channel_tab set tab disabled")
+                self.logger.debug("get_clicked_devinfo::channel_tab set tab disabled")
                 self.channel_tab.setEnabled(False)
 
             else:
-                print("get_clicked_devinfo::NOT IN!! channel_tab set tab enabled")
+                self.logger.debug("get_clicked_devinfo::channel_tab set tab enabled")
                 self.channel_tab.setEnabled(True)
 
             try:
                 self.fill_devinfo(dev_data)
             except Exception as e:
-                print(f"ERROR:::get_clicked_devinfo:fill_devinfo:{e}")
+                self.logger.error(f"get_clicked_devinfo:fill_devinfo:{e}")
         else:
             if len(self.dev_profile) != self.searched_devnum:
                 self.logger.info(
@@ -3761,7 +3758,7 @@ class WIZWindow(QMainWindow, main_window):
     def fill_devinfo(self, dev_data):
         if not self.curr_dev or not self.curr_ver:
             return
-        print("fill_devinfo", type(dev_data), dev_data)
+        self.logger.debug(f"fill_devinfo type={type(dev_data)}")
         try:
             # device info (RO)
             if "MN" in dev_data:
@@ -3872,7 +3869,7 @@ class WIZWindow(QMainWindow, main_window):
                 self.ch1_pack_char.setText(dev_data["PD"])
             # Send Data at Connection - W55RP20-S2E only (버전 1.1.8 이상)
             if "SD" in dev_data and self.curr_dev in (W55RP20_FAMILY + ("W232N", "IP20")) and version_compare(self.curr_ver, "1.1.8") >= 0:
-                print(f"[DEBUG] Loading SD data: '{dev_data['SD']}'")
+                self.logger.debug(f"Loading SD data: '{dev_data['SD']}'")
                 # 공백(" ")인 경우 빈 문자열로 표시
                 if dev_data["SD"] == " ":
                     self.ch1_pack_char_3.clear()
@@ -3880,7 +3877,7 @@ class WIZWindow(QMainWindow, main_window):
                     self.ch1_pack_char_3.setText(dev_data["SD"])
             # Send Data at Disconnection - W55RP20-S2E only (버전 1.1.8 이상)
             if "DD" in dev_data and self.curr_dev in (W55RP20_FAMILY + ("W232N", "IP20")) and version_compare(self.curr_ver, "1.1.8") >= 0:
-                print(f"[DEBUG] Loading DD data: '{dev_data['DD']}'")
+                self.logger.debug(f"Loading DD data: '{dev_data['DD']}'")
                 # 공백(" ")인 경우 빈 문자열로 표시
                 if dev_data["DD"] == " ":
                     self.ch1_pack_char_4.clear()
@@ -3888,7 +3885,7 @@ class WIZWindow(QMainWindow, main_window):
                     self.ch1_pack_char_4.setText(dev_data["DD"])
             # Ethernet Data Connection Condition - W55RP20-S2E, W232N, IP20 (버전 1.1.8 이상)
             if "SE" in dev_data and self.curr_dev in (W55RP20_FAMILY + ("W232N", "IP20")) and version_compare(self.curr_ver, "1.1.8") >= 0:
-                print(f"[DEBUG] Loading SE data: '{dev_data['SE']}'")
+                self.logger.debug(f"Loading SE data: '{dev_data['SE']}'")
                 # 공백(" ")인 경우 빈 문자열로 표시
                 if dev_data["SE"] == " ":
                     self.ch1_pack_char_5.clear()
@@ -4314,7 +4311,7 @@ class WIZWindow(QMainWindow, main_window):
             # 문맥으로 보면 modbus_protocol.isEnabled() 로 처리하는게 맞지만 항상 False 가 나와서 모델&버전 비교로 대체 #36
             if self._modbus_supported():
                 modbus_key = self._modbus_param_key()
-                print(
+                self.logger.debug(
                     f"set {modbus_key} valid, self.curr_dev={self.curr_dev}, self.curr_ver={self.curr_ver}"
                 )
                 setcmd[modbus_key] = str(self.modbus_protocol.currentIndex())
@@ -4330,7 +4327,7 @@ class WIZWindow(QMainWindow, main_window):
                     sd_data = sd_data[:30]
                     self.ch1_pack_char_3.setText(sd_data)  # UI도 업데이트
                 # 빈 문자열인 경우 공백 전송 (MQTT와 동일한 방식)
-                print(f"[DEBUG] Saving SD data: '{sd_data}'")
+                self.logger.debug(f"Saving SD data: '{sd_data}'")
                 setcmd["SD"] = sd_data if sd_data else " "
 
                 # Send Data at Disconnection - W55RP20-S2E, W232N, IP20
@@ -4340,7 +4337,7 @@ class WIZWindow(QMainWindow, main_window):
                     dd_data = dd_data[:30]
                     self.ch1_pack_char_4.setText(dd_data)  # UI도 업데이트
                 # 빈 문자열인 경우 공백 전송 (MQTT와 동일한 방식)
-                print(f"[DEBUG] Saving DD data: '{dd_data}'")
+                self.logger.debug(f"Saving DD data: '{dd_data}'")
                 setcmd["DD"] = dd_data if dd_data else " "
 
                 # Ethernet Data Connection Condition - W55RP20-S2E, W232N, IP20
@@ -4350,7 +4347,7 @@ class WIZWindow(QMainWindow, main_window):
                     se_data = se_data[:30]
                     self.ch1_pack_char_5.setText(se_data)  # UI도 업데이트
                 # 빈 문자열인 경우 공백 전송 (MQTT와 동일한 방식)
-                print(f"[DEBUG] Saving SE data: '{se_data}'")
+                self.logger.debug(f"Saving SE data: '{se_data}'")
                 setcmd["SE"] = se_data if se_data else " "
             # Inactive timer - channel 1
             setcmd["IT"] = self.ch1_inact_timer.text()
@@ -4628,7 +4625,7 @@ class WIZWindow(QMainWindow, main_window):
             # Parameter validity check
             invalid_flag = 0
             setcmd_cmd = list(setcmd.keys())
-            print(f"do_setting::setcmd={setcmd}")
+            self.logger.debug(f"do_setting::setcmd={setcmd}")
             for i in range(len(setcmd)):
                 if (
                     self.cmdset.isvalidparameter(
@@ -5354,7 +5351,7 @@ class WIZWindow(QMainWindow, main_window):
         variable.moveCursor(QtGui.QTextCursor.End)
 
     def load_cert_btn_clicked(self, cmd):
-        print("load_cert_btn_clicked()", cmd)
+        self.logger.debug(f"load_cert_btn_clicked cmd={cmd}")
 
         ext = "Certificate (*.crt *.pem *.key)"
         if cmd == "UP":
@@ -5466,7 +5463,7 @@ class WIZWindow(QMainWindow, main_window):
     def check_latest_version(self):
         try:
             latest_release = get_latest_release_version("Wiznet", "WIZnet-S2E-Tool-GUI")
-            print(f"The latest release version is: {latest_release}")
+            self.logger.debug(f"The latest release version is: {latest_release}")
             if VERSION.lower() != str(latest_release).lower():
                 self.show_msgbox_info(
                     "Update Available",
@@ -7071,14 +7068,13 @@ class ThreadProgress(QtCore.QThread):
             self.msleep(15)
 
     def __del__(self):
-        print("thread: del")
         self.wait()
 
 
 if __name__ == "__main__":
     # High DPI mode
     # PyQt5 High DPI (일부 환경에서 속성 없을 수 있음)
-    print(f"sys.paltform={sys.platform}")
+    logger.debug(f"sys.platform={sys.platform}")
     if hasattr(Qt, 'AA_EnableHighDpiScaling'):
         QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)  # type: ignore[attr-defined]
     if hasattr(Qt, 'AA_UseHighDpiPixmaps'):
