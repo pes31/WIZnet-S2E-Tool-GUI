@@ -180,6 +180,10 @@ class WIZMSGHandler(QThread):
             self.logger.error("[ERROR] WIZMSGHandler check_parameter(): %r" % e)
 
     def run(self):
+        _fail_emit = {
+            Opcode.OP_SEARCHALL:  (self.search_result, 0),
+            Opcode.OP_SETCOMMAND: (self.set_result,    -1),
+        }
         t_send = None
         try:
             self.makecommands()
@@ -191,6 +195,10 @@ class WIZMSGHandler(QThread):
                 t_send = time.time()
         except Exception as e:
             self.logger.error(f"[ERROR] WIZMSGHandler sendcommands: {e}")
+            sig, val = _fail_emit.get(self.opcode, (None, None))
+            if sig:
+                sig.emit(val)
+            return
 
         try:
             if t_send is not None:
@@ -360,6 +368,9 @@ class WIZMSGHandler(QThread):
                 # sys.stdout.write("%s\r\n" % self.mac_list)
         except Exception as e:
             self.logger.error(f"[ERROR] WIZMSGHandler error: {e}")
+            sig, val = _fail_emit.get(self.opcode, (None, None))
+            if sig:
+                sig.emit(val)
 
 
 class DataRefresh(QThread):
