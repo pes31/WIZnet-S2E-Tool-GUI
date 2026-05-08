@@ -1334,17 +1334,8 @@ class WIZWindow(QMainWindow, main_window):
     def object_config_for_device(self):
         if not self.curr_dev or not self.curr_ver:
             return
-        # IP20도 Certificate manager 탭 표시 (SSL/MQTTS 지원)
-        # if self.curr_dev == "IP20":
-        #     # certificate_tab_text는 init_ui_object에서 저장됨
-        #     n_tabs = self.generalTab.count()
-        #     for idx in range(n_tabs):
-        #         if self.generalTab.tabText(idx) == self.certificate_tab_text:
-        #             self.generalTab.removeTab(idx)
-        #             break
 
         # W55RP20-S2E, W232N, IP20인 경우에만 group_packing_12 표시 (SD/DD 기능)
-        # 버전이 1.1.8 이상인 경우에만 표시
         if self.curr_dev in (W55RP20_FAMILY + ("W232N", "IP20")) and version_compare(self.curr_ver, "1.1.8") >= 0:
             self.group_packing_12.show()
             self.group_packing_13.show()
@@ -1352,21 +1343,18 @@ class WIZWindow(QMainWindow, main_window):
             self.group_packing_12.hide()
             self.group_packing_13.hide()
 
-        # ...existing code...
         is_security_two_port = self.curr_dev in SECURITY_TWO_PORT_DEV
         is_legacy_two_port = (
             (self.curr_dev in TWO_PORT_DEV or "WIZ752" in self.curr_dev)
             and not is_security_two_port
         )
 
-        # Channel #0 Modbus option is hidden on legacy two-port models that reuse the UI
         if is_legacy_two_port:
             self.group_modubs_option.hide()
             self.modbus_protocol.setCurrentIndex(0)
         else:
             self.group_modubs_option.show()
 
-        # Channel #1 timeout widgets are only applicable to security two-port devices
         if is_security_two_port:
             self.groupbox_ch1_timeout_2.show()
             self.groupbox_ch1_timeout_2.setEnabled(True)
@@ -1374,12 +1362,10 @@ class WIZWindow(QMainWindow, main_window):
             self.groupbox_ch1_timeout_2.hide()
             self.groupbox_ch1_timeout_2.setEnabled(False)
 
-        # WIZ5XX 가 아니면 modbus 는 사용 불가 #36
         self.logger.debug(
             f"model={self.curr_dev},ver={self.curr_ver},version compare={version_compare(self.curr_ver, '1.0.8')},status={self.curr_st}"
         )
         if self.curr_st in DeviceStatusMinimum:
-            # Ensure Modbus option is not left enabled when device is in BOOT/UPGRADE
             self.modbus_protocol.setEnabled(False)
             self.modbus_protocol.setCurrentIndex(0)
             self.group_modubs_option_2.hide()
@@ -1400,6 +1386,13 @@ class WIZWindow(QMainWindow, main_window):
             self.modbus_protocol_2.setCurrentIndex(0)
             self.group_packing_14.hide()
             self.group_packing_15.hide()
+
+        self._config_serial_for_device()
+        self._config_status_pin_for_device()
+        self._config_security_options()
+
+    def _config_serial_for_device(self):
+        """장치별 보드레이트/시리얼 포트 설정."""
         if "WIZ107" in self.curr_dev or "WIZ108" in self.curr_dev:
             # WIZ107SR / WIZ108SR 전용 처리
             self.tcp_timeout.setVisible(False)
@@ -1429,11 +1422,9 @@ class WIZWindow(QMainWindow, main_window):
             # DDNS 필드 활성화 상태 초기 적용
             self.event_ddns_enable()
         elif "WIZ750" in self.curr_dev or "WIZ750SR-T1L" in self.curr_dev or "W232N" in self.curr_dev:
-            # 다른 장치 선택 시 ip_pppoe 숨기고 DB 9-bit 항목 제거
             self.ip_pppoe.setVisible(False)
             if self.ch1_databit.count() > 2:
                 self.ch1_databit.removeItem(2)
-            # 9-bit 잠금 해제
             self.ch1_parity.setEnabled(True)
             self.ch1_stopbit.setEnabled(True)
 
@@ -1446,19 +1437,14 @@ class WIZWindow(QMainWindow, main_window):
             else:
                 self.tcp_timeout.setEnabled(False)
 
-            # 'OP' option
             self.ch1_ssl_tcpclient.setEnabled(False)
             self.ch1_mqttclient.setEnabled(False)
             self.ch1_mqtts_client.setEnabled(False)
 
-            # Baudrate configuration - get current device's BR value from dev_profile
-            current_baud = self._get_current_baud_from_profile(13)  # WIZ750SR/W232N: max BR index 13 (230400)
-
-            # Baudrate configuration for WIZ750SR/W232N (max 230400)
+            # WIZ750SR/W232N: 최대 230400 (index 0-13)
+            current_baud = self._get_current_baud_from_profile(13)
             self.ch1_baud.clear()
             self.ch1_baud.addItems(BAUDRATE_BASE)  # 300 ~ 230400 (14 items)
-
-            # Restore current device's selection
             if current_baud:
                 idx = self.ch1_baud.findText(current_baud)
                 if idx >= 0:
@@ -1469,39 +1455,26 @@ class WIZWindow(QMainWindow, main_window):
                 self.ch1_databit.removeItem(2)
             self.ch1_parity.setEnabled(True)
             self.ch1_stopbit.setEnabled(True)
-            # W55RP20: 펌웨어 버전에 따라 고속 보드레이트 지원 여부 결정
-            # - FW < 1.2.1: BR 0-15 (최대 921600)
-            # - FW >= 1.2.1: BR 0-19 (최대 8M, 1M/2M/4M/8M 지원)
-            supports_high_speed = False
-            if hasattr(self, 'curr_ver') and self.curr_ver:
-                supports_high_speed = version_compare(self.curr_ver, "1.2.1") >= 0
-
-            # Baudrate configuration - get current device's BR value from dev_profile
+            # W55RP20: FW < 1.2.1 → 최대 921600, FW >= 1.2.1 → 최대 8M
+            supports_high_speed = bool(self.curr_ver and version_compare(self.curr_ver, "1.2.1") >= 0)
             max_br_index = 19 if supports_high_speed else 15
             current_baud = self._get_current_baud_from_profile(max_br_index)
 
-            # Baudrate configuration for W55RP20
             self.ch1_baud.clear()
-            self.ch1_baud.addItems(BAUDRATE_BASE)  # 300 ~ 230400 (14 items)
-            self.ch1_baud.addItem("460800")  # Add 460800 (index 14)
-            self.ch1_baud.addItem("921600")  # Add 921600 (index 15)
-
-            # 펌웨어 1.2.1 이상에서만 고속 보드레이트 추가
+            self.ch1_baud.addItems(BAUDRATE_BASE)  # 0-13
+            self.ch1_baud.addItem("460800")  # 14
+            self.ch1_baud.addItem("921600")  # 15
             if supports_high_speed:
-                self.ch1_baud.addItem("1M")  # Add 1M (index 16)
-                self.ch1_baud.addItem("2M")  # Add 2M (index 17)
-                self.ch1_baud.addItem("4M")  # Add 4M (index 18)
-                self.ch1_baud.addItem("8M")  # Add 8M (index 19)
-
-            # Restore current device's selection
+                self.ch1_baud.addItem("1M")   # 16
+                self.ch1_baud.addItem("2M")   # 17
+                self.ch1_baud.addItem("4M")   # 18
+                self.ch1_baud.addItem("8M")   # 19
             if current_baud:
                 idx = self.ch1_baud.findText(current_baud)
                 if idx >= 0:
                     self.ch1_baud.setCurrentIndex(idx)
 
-            # 2CH device: ch2_baud도 ch1_baud와 동일하게 구성 (버전에 따라)
             if self.curr_dev in SECURITY_TWO_PORT_DEV:
-                # ch2_baud의 현재 EB 값 가져오기
                 current_ch2_baud = None
                 if self.curr_mac in self.dev_profile:
                     dev_data = self.dev_profile[self.curr_mac]
@@ -1509,24 +1482,14 @@ class WIZWindow(QMainWindow, main_window):
                         try:
                             eb_index = int(dev_data["EB"])
                             if 0 <= eb_index <= max_br_index:
+                                _eb_map = {14: "460800", 15: "921600", 16: "1M", 17: "2M", 18: "4M", 19: "8M"}
                                 if eb_index < len(BAUDRATE_BASE):
                                     current_ch2_baud = BAUDRATE_BASE[eb_index]
-                                elif eb_index == 14:
-                                    current_ch2_baud = "460800"
-                                elif eb_index == 15:
-                                    current_ch2_baud = "921600"
-                                elif eb_index == 16:
-                                    current_ch2_baud = "1M"
-                                elif eb_index == 17:
-                                    current_ch2_baud = "2M"
-                                elif eb_index == 18:
-                                    current_ch2_baud = "4M"
-                                elif eb_index == 19:
-                                    current_ch2_baud = "8M"
+                                else:
+                                    current_ch2_baud = _eb_map.get(eb_index)
                         except (ValueError, TypeError):
                             pass
 
-                # ch2_baud를 ch1_baud와 동일하게 구성
                 self.ch2_baud.clear()
                 self.ch2_baud.addItems(BAUDRATE_BASE)  # 0-13
                 self.ch2_baud.addItem("460800")  # 14
@@ -1536,8 +1499,6 @@ class WIZWindow(QMainWindow, main_window):
                     self.ch2_baud.addItem("2M")   # 17
                     self.ch2_baud.addItem("4M")   # 18
                     self.ch2_baud.addItem("8M")   # 19
-
-                # ch2_baud 현재 선택값 복원
                 if current_ch2_baud:
                     idx = self.ch2_baud.findText(current_ch2_baud)
                     if idx >= 0:
@@ -1548,16 +1509,12 @@ class WIZWindow(QMainWindow, main_window):
                 self.ch1_databit.removeItem(2)
             self.ch1_parity.setEnabled(True)
             self.ch1_stopbit.setEnabled(True)
-            # Baudrate configuration - get current device's BR value from dev_profile
-            current_baud = self._get_current_baud_from_profile(15)  # IP20: max BR index 15 (921600)
-
-            # Baudrate configuration for IP20 (max 921600)
+            # IP20: 최대 921600 (index 0-15)
+            current_baud = self._get_current_baud_from_profile(15)
             self.ch1_baud.clear()
-            self.ch1_baud.addItems(BAUDRATE_BASE)  # 300 ~ 230400 (14 items)
-            self.ch1_baud.addItem("460800")  # Add 460800 (index 14)
-            self.ch1_baud.addItem("921600")  # Add 921600 (index 15)
-
-            # Restore current device's selection
+            self.ch1_baud.addItems(BAUDRATE_BASE)  # 0-13
+            self.ch1_baud.addItem("460800")  # 14
+            self.ch1_baud.addItem("921600")  # 15
             if current_baud:
                 idx = self.ch1_baud.findText(current_baud)
                 if idx >= 0:
@@ -1568,53 +1525,49 @@ class WIZWindow(QMainWindow, main_window):
                 self.ch1_databit.removeItem(2)
             self.ch1_parity.setEnabled(True)
             self.ch1_stopbit.setEnabled(True)
-            # Baudrate configuration - get current device's BR value from dev_profile
-            current_baud = self._get_current_baud_from_profile(14)  # Other devices: max BR index 14 (460800)
-
-            # Baudrate configuration for other devices (max 460800)
+            # 기타 장치: 최대 460800 (index 0-14)
+            current_baud = self._get_current_baud_from_profile(14)
             self.ch1_baud.clear()
-            self.ch1_baud.addItems(BAUDRATE_BASE)  # 300 ~ 230400 (14 items)
-            self.ch1_baud.addItem("460800")  # Add 460800 (index 14)
-
-            # Restore current device's selection
+            self.ch1_baud.addItems(BAUDRATE_BASE)  # 0-13
+            self.ch1_baud.addItem("460800")  # 14
             if current_baud:
                 idx = self.ch1_baud.findText(current_baud)
                 if idx >= 0:
                     self.ch1_baud.setCurrentIndex(idx)
 
-            # TODO: ch2_baud (EB) 관리 개선 필요 - 2채널 baudrate 목록 관리 로직 검토 및 리팩토링
-            # Remove 921600 from ch2 if exists
+            # TODO: ch2_baud (EB) 관리 개선 필요
             idx_921 = self.ch2_baud.findText("921600")
             if idx_921 != -1:
                 self.ch2_baud.removeItem(idx_921)
 
-        # SC: Status pin option
+    def _config_status_pin_for_device(self):
+        """SC 상태 핀 옵션 설정."""
         if "WIZ107" in self.curr_dev or "WIZ108" in self.curr_dev:
-            pass
-        else:
-            if self.curr_dev in SECURITY_DEVICE:
-                self.radiobtn_group_s0.hide()
-                self.radiobtn_group_s1.hide()
-                self.group_dtrdsr.show()
-                if 'WIZ5XXSR' in self.curr_dev or self.curr_dev in W55RP20_FAMILY or 'W232N' in self.curr_dev or 'IP20' in self.curr_dev:
-                    self.groupbox_ch1_timeout.show()
-                    self.groupbox_ch1_timeout.setEnabled(True)
-                else:
-                    self.groupbox_ch1_timeout.hide()
-                    self.groupbox_ch1_timeout.setEnabled(False)
+            return
+        if self.curr_dev in SECURITY_DEVICE:
+            self.radiobtn_group_s0.hide()
+            self.radiobtn_group_s1.hide()
+            self.group_dtrdsr.show()
+            if 'WIZ5XXSR' in self.curr_dev or self.curr_dev in W55RP20_FAMILY or 'W232N' in self.curr_dev or 'IP20' in self.curr_dev:
+                self.groupbox_ch1_timeout.show()
+                self.groupbox_ch1_timeout.setEnabled(True)
             else:
-                self.radiobtn_group_s0.show()
-                self.radiobtn_group_s1.show()
-                self.group_dtrdsr.hide()
                 self.groupbox_ch1_timeout.hide()
+                self.groupbox_ch1_timeout.setEnabled(False)
+        else:
+            self.radiobtn_group_s0.show()
+            self.radiobtn_group_s1.show()
+            self.group_dtrdsr.hide()
+            self.groupbox_ch1_timeout.hide()
 
+    def _config_security_options(self):
+        """SECURITY_DEVICE 관련 옵션 및 ch2 공통 옵션 설정."""
         if self.curr_dev in SECURITY_DEVICE:
             self.tcp_timeout.setEnabled(True)
             if self.factory_setting_action is not None:
                 self.factory_setting_action.setEnabled(True)
             if self.factory_firmware_action is not None:
                 self.factory_firmware_action.setEnabled(True)
-            # 'OP' option
             # IP20도 SSL, MQTTs 지원
             self.ch1_ssl_tcpclient.setEnabled(True)
             self.ch1_mqtts_client.setEnabled(True)
@@ -1623,7 +1576,6 @@ class WIZWindow(QMainWindow, main_window):
             self.group_current_bank.show()
             if 'WIZ5XXSR' in self.curr_dev or self.curr_dev in W55RP20_FAMILY or 'W232N' in self.curr_dev or 'IP20' in self.curr_dev:
                 self.group_current_bank.hide()
-                # self.combobox_current_bank.setEnabled(True)
             else:
                 self.combobox_current_bank.setEnabled(False)
         else:
@@ -1631,14 +1583,11 @@ class WIZWindow(QMainWindow, main_window):
                 self.factory_setting_action.setEnabled(True)
             if self.factory_firmware_action is not None:
                 self.factory_firmware_action.setEnabled(False)
-            # 'OP' option
             self.ch1_ssl_tcpclient.setEnabled(False)
             self.ch1_mqttclient.setEnabled(False)
             self.ch1_mqtts_client.setEnabled(False)
-            # Current bank (RO)
             self.group_current_bank.hide()
 
-        # op channel#2 option
         self.ch2_ssl_tcpclient.setEnabled(False)
         self.ch2_mqttclient.setEnabled(False)
         self.ch2_mqtts_client.setEnabled(False)
