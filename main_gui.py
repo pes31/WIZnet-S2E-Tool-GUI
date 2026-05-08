@@ -765,7 +765,7 @@ class WIZWindow(QMainWindow, main_window):
             QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed
         )
         self._btn_terminal.setCheckable(True)
-        self._btn_terminal.setMinimumSize(85, 62)
+        self._btn_terminal.setMinimumSize(85, 68)
         self._btn_terminal.setMaximumSize(240, 100)
         self._btn_terminal.setIconSize(QtCore.QSize(32, 32))
         self._btn_terminal.setFont(self.midfont)

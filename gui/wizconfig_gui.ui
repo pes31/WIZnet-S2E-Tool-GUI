@@ -9807,7 +9807,7 @@ interval</string>
             <property name="minimumSize">
              <size>
               <width>85</width>
-              <height>62</height>
+              <height>68</height>
              </size>
             </property>
             <property name="maximumSize">
@@ -9864,7 +9864,7 @@ Search</string>
             <property name="minimumSize">
              <size>
               <width>85</width>
-              <height>62</height>
+              <height>68</height>
              </size>
             </property>
             <property name="maximumSize">
@@ -9921,7 +9921,7 @@ Settings</string>
             <property name="minimumSize">
              <size>
               <width>85</width>
-              <height>62</height>
+              <height>68</height>
              </size>
             </property>
             <property name="maximumSize">
@@ -9978,7 +9978,7 @@ Upload</string>
             <property name="minimumSize">
              <size>
               <width>85</width>
-              <height>62</height>
+              <height>68</height>
              </size>
             </property>
             <property name="maximumSize">
@@ -10035,7 +10035,7 @@ Device</string>
             <property name="minimumSize">
              <size>
               <width>85</width>
-              <height>62</height>
+              <height>68</height>
              </size>
             </property>
             <property name="maximumSize">
@@ -10123,7 +10123,7 @@ Reset</string>
             <property name="minimumSize">
              <size>
               <width>85</width>
-              <height>62</height>
+              <height>68</height>
              </size>
             </property>
             <property name="maximumSize">
@@ -10176,7 +10176,7 @@ Config</string>
             <property name="minimumSize">
              <size>
               <width>85</width>
-              <height>62</height>
+              <height>68</height>
              </size>
             </property>
             <property name="maximumSize">
