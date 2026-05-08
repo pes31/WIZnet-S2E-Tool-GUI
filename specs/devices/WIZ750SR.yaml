@@ -81,6 +81,10 @@ fw_constraints:
   config_port: 50001
 
 ui:
+  widget_overrides:
+    tcp_timeout:
+      visible: true
+      tooltip: "Requires firmware 1.2.0 or later"
   tabs:
     - id: network
       label: "Network"

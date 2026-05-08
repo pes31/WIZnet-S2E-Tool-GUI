@@ -1391,154 +1391,97 @@ class WIZWindow(QMainWindow, main_window):
         self._config_status_pin_for_device()
         self._config_security_options()
 
-    def _config_serial_for_device(self):
-        """장치별 보드레이트/시리얼 포트 설정."""
-        if "WIZ107" in self.curr_dev or "WIZ108" in self.curr_dev:
-            # WIZ107SR / WIZ108SR 전용 처리
-            self.tcp_timeout.setVisible(False)
-            self.tcp_timeout_label.setVisible(False)
-            self.ch1_ssl_tcpclient.setEnabled(False)
-            self.ch1_mqttclient.setEnabled(False)
-            self.ch1_mqtts_client.setEnabled(False)
-
-            # ip_pppoe 라디오버튼 표시 (PPPoE 지원)
-            self.ip_pppoe.setVisible(True)
-
-            # DB: 9-bit 항목 동적 추가 (기존 7/8 bit에 추가)
-            if self.ch1_databit.count() < 3:
-                self.ch1_databit.addItem("9-bit")
-
-            # Baudrate: 최대 230400 (index 0-13)
-            current_baud = self._get_current_baud_from_profile(13)
+    def _apply_serial_from_spec(self, spec) -> None:
+        """DeviceSpec 기반으로 시리얼 포트 UI 설정."""
+        # 1. ch1_baud
+        br_entry = spec.cmdset.get('BR')
+        if br_entry:
+            sorted_br = sorted(br_entry.values.items(), key=lambda x: int(x[0]))
+            br_strings = [v for _, v in sorted_br]
+            current_br = None
+            if self.curr_mac in self.dev_profile:
+                br_raw = self.dev_profile[self.curr_mac].get('BR')
+                if br_raw is not None:
+                    try:
+                        current_br = br_entry.values.get(str(int(br_raw)))
+                    except (ValueError, TypeError):
+                        pass
             self.ch1_baud.clear()
-            self.ch1_baud.addItems(BAUDRATE_BASE)  # 300 ~ 230400 (14 items)
-            if current_baud:
-                idx = self.ch1_baud.findText(current_baud)
+            self.ch1_baud.addItems(br_strings)
+            if current_br:
+                idx = self.ch1_baud.findText(current_br)
                 if idx >= 0:
                     self.ch1_baud.setCurrentIndex(idx)
 
-            # DB 9-bit 현재 상태에 따라 PR/SB 제약 초기 적용
-            self.event_ch1_databit_changed(self.ch1_databit.currentIndex())
-            # DDNS 필드 활성화 상태 초기 적용
-            self.event_ddns_enable()
-        elif "WIZ750" in self.curr_dev or "WIZ750SR-T1L" in self.curr_dev or "W232N" in self.curr_dev:
-            self.ip_pppoe.setVisible(False)
-            if self.ch1_databit.count() > 2:
-                self.ch1_databit.removeItem(2)
-            self.ch1_parity.setEnabled(True)
-            self.ch1_stopbit.setEnabled(True)
-
-            # TR 필드 복원 (WIZ107/108에서 전환 시)
-            self.tcp_timeout.setVisible(True)
-            self.tcp_timeout_label.setVisible(True)
-
-            if version_compare("1.2.0", self.curr_ver) <= 0:
-                self.tcp_timeout.setEnabled(True)
-            else:
-                self.tcp_timeout.setEnabled(False)
-
-            self.ch1_ssl_tcpclient.setEnabled(False)
-            self.ch1_mqttclient.setEnabled(False)
-            self.ch1_mqtts_client.setEnabled(False)
-
-            # WIZ750SR/W232N: 최대 230400 (index 0-13)
-            current_baud = self._get_current_baud_from_profile(13)
-            self.ch1_baud.clear()
-            self.ch1_baud.addItems(BAUDRATE_BASE)  # 300 ~ 230400 (14 items)
-            if current_baud:
-                idx = self.ch1_baud.findText(current_baud)
-                if idx >= 0:
-                    self.ch1_baud.setCurrentIndex(idx)
-        elif self.curr_dev in W55RP20_FAMILY:
-            self.ip_pppoe.setVisible(False)
-            if self.ch1_databit.count() > 2:
-                self.ch1_databit.removeItem(2)
-            self.ch1_parity.setEnabled(True)
-            self.ch1_stopbit.setEnabled(True)
-            # W55RP20: FW < 1.2.1 → 최대 921600, FW >= 1.2.1 → 최대 8M
-            supports_high_speed = bool(self.curr_ver and version_compare(self.curr_ver, "1.2.1") >= 0)
-            max_br_index = 19 if supports_high_speed else 15
-            current_baud = self._get_current_baud_from_profile(max_br_index)
-
-            self.ch1_baud.clear()
-            self.ch1_baud.addItems(BAUDRATE_BASE)  # 0-13
-            self.ch1_baud.addItem("460800")  # 14
-            self.ch1_baud.addItem("921600")  # 15
-            if supports_high_speed:
-                self.ch1_baud.addItem("1M")   # 16
-                self.ch1_baud.addItem("2M")   # 17
-                self.ch1_baud.addItem("4M")   # 18
-                self.ch1_baud.addItem("8M")   # 19
-            if current_baud:
-                idx = self.ch1_baud.findText(current_baud)
-                if idx >= 0:
-                    self.ch1_baud.setCurrentIndex(idx)
-
-            if self.curr_dev in SECURITY_TWO_PORT_DEV:
-                current_ch2_baud = None
+        # 2. ch2_baud (2채널 장치)
+        if spec.channels == 2:
+            eb_entry = spec.cmdset.get('EB')
+            if eb_entry:
+                sorted_eb = sorted(eb_entry.values.items(), key=lambda x: int(x[0]))
+                eb_strings = [v for _, v in sorted_eb]
+                current_eb = None
                 if self.curr_mac in self.dev_profile:
-                    dev_data = self.dev_profile[self.curr_mac]
-                    if "EB" in dev_data:
+                    eb_raw = self.dev_profile[self.curr_mac].get('EB')
+                    if eb_raw is not None:
                         try:
-                            eb_index = int(dev_data["EB"])
-                            if 0 <= eb_index <= max_br_index:
-                                _eb_map = {14: "460800", 15: "921600", 16: "1M", 17: "2M", 18: "4M", 19: "8M"}
-                                if eb_index < len(BAUDRATE_BASE):
-                                    current_ch2_baud = BAUDRATE_BASE[eb_index]
-                                else:
-                                    current_ch2_baud = _eb_map.get(eb_index)
+                            current_eb = eb_entry.values.get(str(int(eb_raw)))
                         except (ValueError, TypeError):
                             pass
-
                 self.ch2_baud.clear()
-                self.ch2_baud.addItems(BAUDRATE_BASE)  # 0-13
-                self.ch2_baud.addItem("460800")  # 14
-                self.ch2_baud.addItem("921600")  # 15
-                if supports_high_speed:
-                    self.ch2_baud.addItem("1M")   # 16
-                    self.ch2_baud.addItem("2M")   # 17
-                    self.ch2_baud.addItem("4M")   # 18
-                    self.ch2_baud.addItem("8M")   # 19
-                if current_ch2_baud:
-                    idx = self.ch2_baud.findText(current_ch2_baud)
+                self.ch2_baud.addItems(eb_strings)
+                if current_eb:
+                    idx = self.ch2_baud.findText(current_eb)
                     if idx >= 0:
                         self.ch2_baud.setCurrentIndex(idx)
-        elif "IP20" in self.curr_dev:
-            self.ip_pppoe.setVisible(False)
-            if self.ch1_databit.count() > 2:
-                self.ch1_databit.removeItem(2)
-            self.ch1_parity.setEnabled(True)
-            self.ch1_stopbit.setEnabled(True)
-            # IP20: 최대 921600 (index 0-15)
-            current_baud = self._get_current_baud_from_profile(15)
-            self.ch1_baud.clear()
-            self.ch1_baud.addItems(BAUDRATE_BASE)  # 0-13
-            self.ch1_baud.addItem("460800")  # 14
-            self.ch1_baud.addItem("921600")  # 15
-            if current_baud:
-                idx = self.ch1_baud.findText(current_baud)
-                if idx >= 0:
-                    self.ch1_baud.setCurrentIndex(idx)
-        else:
-            self.ip_pppoe.setVisible(False)
-            if self.ch1_databit.count() > 2:
-                self.ch1_databit.removeItem(2)
-            self.ch1_parity.setEnabled(True)
-            self.ch1_stopbit.setEnabled(True)
-            # 기타 장치: 최대 460800 (index 0-14)
-            current_baud = self._get_current_baud_from_profile(14)
-            self.ch1_baud.clear()
-            self.ch1_baud.addItems(BAUDRATE_BASE)  # 0-13
-            self.ch1_baud.addItem("460800")  # 14
-            if current_baud:
-                idx = self.ch1_baud.findText(current_baud)
-                if idx >= 0:
-                    self.ch1_baud.setCurrentIndex(idx)
 
-            # TODO: ch2_baud (EB) 관리 개선 필요
-            idx_921 = self.ch2_baud.findText("921600")
-            if idx_921 != -1:
-                self.ch2_baud.removeItem(idx_921)
+        # 3. ip_pppoe — IM['2'] 존재 여부
+        im_entry = spec.cmdset.get('IM')
+        has_pppoe = im_entry is not None and '2' in im_entry.values
+        self.ip_pppoe.setVisible(has_pppoe)
+
+        # 4. DB 9-bit 항목
+        db_entry = spec.cmdset.get('DB')
+        has_9bit = db_entry is not None and '2' in db_entry.values
+        if has_9bit:
+            if self.ch1_databit.count() < 3:
+                self.ch1_databit.addItem("9-bit")
+        else:
+            if self.ch1_databit.count() > 2:
+                self.ch1_databit.removeItem(2)
+            self.ch1_parity.setEnabled(True)
+            self.ch1_stopbit.setEnabled(True)
+
+        # 5. tcp_timeout — TR in search_cmd_list + widget_override
+        tr_in_spec = 'TR' in spec.search_cmd_list
+        wo = spec.ui_config.widget_overrides.get('tcp_timeout')
+        visible = wo.visible if (wo and wo.visible is not None) else tr_in_spec
+        enabled = wo.enabled if (wo and wo.enabled is not None) else tr_in_spec
+        self.tcp_timeout.setVisible(visible)
+        self.tcp_timeout_label.setVisible(visible)
+        self.tcp_timeout.setEnabled(enabled)
+        tip = (wo.tooltip or "") if (wo and not enabled) else ""
+        self.tcp_timeout.setToolTip(tip)
+        self.tcp_timeout_label.setToolTip(tip)
+        self.tcp_timeout.setAttribute(Qt.WA_AlwaysShowToolTips, bool(tip))
+
+        # 6. 콜백
+        if has_9bit:
+            self.event_ch1_databit_changed(self.ch1_databit.currentIndex())
+        if 'DD' in spec.cmdset:
+            self.event_ddns_enable()
+
+    def _config_serial_for_device(self):
+        """장치별 보드레이트/시리얼 포트 설정."""
+        from device_spec_loader import load_device, detect_device
+        if not self.curr_dev:
+            return
+        spec_name = detect_device(self.curr_dev) or self.curr_dev
+        try:
+            spec = load_device(spec_name, self.curr_ver)
+        except FileNotFoundError:
+            self.logger.warning(f"_config_serial_for_device: spec not found for {spec_name!r}")
+            return
+        self._apply_serial_from_spec(spec)
 
     def _config_status_pin_for_device(self):
         """SC 상태 핀 옵션 설정."""

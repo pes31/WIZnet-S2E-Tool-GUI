@@ -85,9 +85,11 @@ class WidgetOverride:
     """
     파생 규칙으로 결정할 수 없는 위젯 상태 예외 선언.
     None = 파생 규칙에 맡김 / bool = 명시적 강제.
+    tooltip = 비활성 상태일 때 호버 메시지 (None이면 표시 안 함).
     """
     visible: bool | None = None
     enabled: bool | None = None
+    tooltip: str | None = None
 
 
 @dataclass
@@ -262,7 +264,9 @@ def _parse_widget_overrides(raw: dict, fw_ver=None) -> dict[str, WidgetOverride]
         else:
             enabled = None
 
-        result[name] = WidgetOverride(visible=visible, enabled=enabled)
+        tooltip: str | None = wo.get("tooltip")
+
+        result[name] = WidgetOverride(visible=visible, enabled=enabled, tooltip=tooltip)
     return result
 
 
