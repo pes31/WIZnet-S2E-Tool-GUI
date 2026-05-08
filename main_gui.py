@@ -634,9 +634,12 @@ class WIZWindow(QMainWindow, main_window):
         self.ch2_udp.clicked.connect(self.event_opmode)
 
         # Event: Search method
-        self.broadcast.clicked.connect(self.event_search_method)
-        self.unicast_ip.clicked.connect(self.event_search_method)
+        self.broadcast.clicked.connect(self._on_broadcast_selected)
+        self.unicast_ip.clicked.connect(self._on_unicast_selected)
         # self.unicast_mac.clicked.connect(self.event_search_method)
+        self.localip.textChanged.connect(
+            lambda text: self.search_ipaddr.setText(text) if text and self.unicast_ip.isChecked() else None
+        )
 
         # Event: modbus
         # self.unicast_mac.clicked.connect(self.event_search_method)
@@ -1142,7 +1145,6 @@ class WIZWindow(QMainWindow, main_window):
         self.load_config.setEnabled(True)
 
         self.event_opmode()
-        self.event_search_method()
         self.event_ip_alloc()
         self.event_atmode()
         self.event_keepalive()
@@ -2001,22 +2003,19 @@ class WIZWindow(QMainWindow, main_window):
                 self.group_modubs_option.setEnabled(False)
                 self.modbus_protocol.setCurrentIndex(0)
 
-    def event_search_method(self):
-        self.logger.info(f"localip.text()={self.localip.text()}")
+    def _on_broadcast_selected(self):
+        self.search_ipaddr.setEnabled(False)
+        self.search_port.setEnabled(False)
+        self._reset_retry_counter()
+
+    def _on_unicast_selected(self):
         if self.localip.text():
             self.search_ipaddr.setText(self.localip.text())
+        self.search_ipaddr.setEnabled(True)
+        self.search_port.setEnabled(True)
+        self._reset_retry_counter()
 
-        # UDP Broadcast - disable all input fields
-        if self.broadcast.isChecked():
-            self.search_ipaddr.setEnabled(False)
-            self.search_port.setEnabled(False)
-
-        # TCP Unicast - enable IP and port
-        elif self.unicast_ip.isChecked():
-            self.search_ipaddr.setEnabled(True)
-            self.search_port.setEnabled(True)
-
-        # 검색 방법 변경 시 반복 검색 카운터 리셋
+    def _reset_retry_counter(self):
         if self.retry_search_current > 0:
             self.logger.info(f"검색 방법 변경: 반복 검색 카운터 리셋 ({self.retry_search_current} → 0)")
             self.retry_search_current = 0
