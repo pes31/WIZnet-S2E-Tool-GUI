@@ -3,13 +3,14 @@
 from PyQt5.QtCore import QThread, pyqtSignal
 from wizsocket.TCPClient import TCPClient
 from WIZUDPSock import WIZUDPSock
-from WIZMSGHandler import WIZMSGHandler
 from WIZMakeCMD import SECURITY_DEVICE
-from constants import Opcode, SockState
+from constants import SockState
 from utils import logger
 
 import binascii
+import codecs
 import ipaddress
+import select as _select
 import time
 import threading
 
@@ -27,6 +28,77 @@ def _parse_fw_response(resp: bytes):
     except Exception as e:
         logger.error(f'[FW-2] FW 응답 파싱 실패: {resp!r} → {e}')
         return None
+
+
+_FW_PACKET_SIZE = 4096   # WIZMSGHandler.PACKET_SIZE 와 동일
+_FW_LOOP_TIMEOUT = 0.5   # WIZMSGHandler.loop_select_timeout (OP_FWUP 경로) 와 동일
+
+
+def _fw_send_cmd(sock, cmd_list: list, what_sock: str, timeout: int) -> bytes | None:
+    """FW 업로드 전용 동기 커맨드 전송 (WIZMSGHandler.run() OP_FWUP 경로를 QThread 없이 재현).
+
+    반환:
+      bytes  — FW 응답 수신 (non-empty)
+      b""    — timeout 또는 응답에 FW 필드 없음
+      None   — 소켓 송신 단계에서 예외 발생
+    """
+    msg = bytearray(_FW_PACKET_SIZE)
+    size = 0
+    try:
+        for cmd in cmd_list:
+            msg[size:] = str.encode(cmd[0])
+            size += len(cmd[0])
+            if cmd[0] == "MA":
+                val = cmd[1].replace(":", "")
+                hex_bytes = codecs.decode(val, "hex")
+                msg[size:] = hex_bytes
+                size += 6
+            else:
+                msg[size:] = str.encode(cmd[1])
+                size += len(cmd[1])
+            if "\r\n" not in cmd[1]:
+                msg[size:] = str.encode("\r\n")
+                size += 2
+    except Exception as e:
+        logger.error(f"[_fw_send_cmd] 패킷 빌드 실패: {e}")
+        return None
+
+    try:
+        if what_sock == "udp":
+            sock.sendto(msg)
+        elif what_sock == "tcp":
+            sock.write(msg)
+    except Exception as e:
+        logger.error(f"[_fw_send_cmd] 전송 실패: {e}")
+        return None
+
+    reply = b""
+    replylists = []
+    try:
+        raw_sock = sock.sock
+        if not raw_sock:
+            logger.error("[_fw_send_cmd] sock.sock 미초기화 — open()/connect() 미호출")
+            return None
+        inputs = [raw_sock]
+        readready, _, _ = _select.select(inputs, [], [], timeout)
+        while readready:
+            for s in readready:
+                if s == raw_sock:
+                    if what_sock == "udp":
+                        data, _addr = sock.recvfrom()
+                    else:
+                        data = sock.recvfrom()
+                    replylists = data.split(b"\r\n")
+                    for item in replylists:
+                        if b"FW" in item[:2]:
+                            reply = item[2:]
+            readready, _, _ = _select.select(inputs, [], [], _FW_LOOP_TIMEOUT)
+            if not readready or not replylists:
+                break
+    except Exception as e:
+        logger.error(f"[_fw_send_cmd] 수신 실패: {e}")
+
+    return reply
 
 
 idle_state = 1
@@ -94,14 +166,7 @@ class FWUploadThread(QThread):
         sock_mode = 'TCP' if 'TCP' in self.sock_type else 'UDP'
         self.logger.info(f'[FW-1] AB (App Boot) 명령 전송 → {self.dest_mac} via {sock_mode}')
 
-        if 'TCP' in self.sock_type:
-            self.wizmsghangler = WIZMSGHandler(
-                self.conf_sock, cmd_list, 'tcp', Opcode.OP_FWUP, 2)
-        elif 'UDP' in self.sock_type:
-            self.wizmsghangler = WIZMSGHandler(
-                self.conf_sock, cmd_list, 'udp', Opcode.OP_FWUP, 2)
-
-        self.resp = self.wizmsghangler.run()
+        self.resp = _fw_send_cmd(self.conf_sock, cmd_list, sock_mode.lower(), 2)
         self.logger.info(f'[FW-1] AB 응답: {repr(self.resp)} (장치 리부팅 중이면 빈 값 정상)')
 
         self.uploading_size.emit(1)
@@ -122,19 +187,12 @@ class FWUploadThread(QThread):
 
         sock_mode = 'TCP' if 'TCP' in self.sock_type else 'UDP'
 
-        if 'TCP' in self.sock_type:
-            self.wizmsghangler = WIZMSGHandler(
-                self.conf_sock, cmd_list, 'tcp', Opcode.OP_FWUP, 2)
-        elif 'UDP' in self.sock_type:
-            self.wizmsghangler = WIZMSGHandler(
-                self.conf_sock, cmd_list, 'udp', Opcode.OP_FWUP, 2)
-
         # if no reponse from device, retry for several times.
         for i in range(4):
             self.logger.info(f'[FW-2] {command} 명령 전송 [{i+1}/4] → {self.dest_mac} via {sock_mode}, filesize={self.filesize}')
-            self.resp = self.wizmsghangler.run()
+            self.resp = _fw_send_cmd(self.conf_sock, cmd_list, sock_mode.lower(), 2)
             self.logger.info(f'[FW-2] {command} 응답: {repr(self.resp)}')
-            if self.resp != '':
+            if self.resp:
                 self.logger.info(f'[FW-2] {command} 응답 수신 성공 → retry loop 종료')
                 break
 
