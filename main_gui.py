@@ -1485,52 +1485,89 @@ class WIZWindow(QMainWindow, main_window):
 
     def _config_status_pin_for_device(self):
         """SC 상태 핀 옵션 설정."""
-        if "WIZ107" in self.curr_dev or "WIZ108" in self.curr_dev:
+        from device_spec_loader import load_device, detect_device
+        if not self.curr_dev:
             return
-        if self.curr_dev in SECURITY_DEVICE:
+        spec_name = detect_device(self.curr_dev) or self.curr_dev
+        try:
+            spec = load_device(spec_name, self.curr_ver)
+        except FileNotFoundError:
+            self.logger.warning(f"_config_status_pin_for_device: spec not found for {spec_name!r}")
+            return
+
+        # 이전 기준: curr_dev in SECURITY_DEVICE
+        is_security = spec.family in ("security", "security_two_port")
+        # 이전 기준: "WIZ107" in curr_dev or "WIZ108" in curr_dev → early return(no-op)
+        # 신규: SC 없는 non-security → 명시적 hide (이전 장치 상태 잔류 방지)
+        has_sc = 'SC' in spec.cmdset
+
+        if is_security:
             self.radiobtn_group_s0.hide()
             self.radiobtn_group_s1.hide()
             self.group_dtrdsr.show()
-            if 'WIZ5XXSR' in self.curr_dev or self.curr_dev in W55RP20_FAMILY or 'W232N' in self.curr_dev or 'IP20' in self.curr_dev:
-                self.groupbox_ch1_timeout.show()
-                self.groupbox_ch1_timeout.setEnabled(True)
-            else:
-                self.groupbox_ch1_timeout.hide()
-                self.groupbox_ch1_timeout.setEnabled(False)
-        else:
+            # 이전 기준: 'WIZ5XXSR' in curr_dev or curr_dev in W55RP20_FAMILY
+            #             or 'W232N' in curr_dev or 'IP20' in curr_dev
+            # 신규: security 기본값 True, 예외(WIZ510SSL)만 widget_override로 선언
+            wo = spec.ui_config.widget_overrides.get('groupbox_ch1_timeout')
+            ch1_to_vis = wo.visible if (wo and wo.visible is not None) else True
+            self.groupbox_ch1_timeout.setVisible(ch1_to_vis)
+            self.groupbox_ch1_timeout.setEnabled(ch1_to_vis)
+        elif has_sc:
             self.radiobtn_group_s0.show()
             self.radiobtn_group_s1.show()
             self.group_dtrdsr.hide()
             self.groupbox_ch1_timeout.hide()
+            self.groupbox_ch1_timeout.setEnabled(False)
+        else:
+            # SC 없는 non-security (WIZ107SR/108SR)
+            self.radiobtn_group_s0.hide()
+            self.radiobtn_group_s1.hide()
+            self.group_dtrdsr.hide()
+            self.groupbox_ch1_timeout.hide()
+            self.groupbox_ch1_timeout.setEnabled(False)
 
     def _config_security_options(self):
         """SECURITY_DEVICE 관련 옵션 및 ch2 공통 옵션 설정."""
-        if self.curr_dev in SECURITY_DEVICE:
-            self.tcp_timeout.setEnabled(True)
-            if self.factory_setting_action is not None:
-                self.factory_setting_action.setEnabled(True)
-            if self.factory_firmware_action is not None:
-                self.factory_firmware_action.setEnabled(True)
-            # IP20도 SSL, MQTTs 지원
-            self.ch1_ssl_tcpclient.setEnabled(True)
-            self.ch1_mqtts_client.setEnabled(True)
-            self.ch1_mqttclient.setEnabled(True)
-            # Current bank (RO)
-            self.group_current_bank.show()
-            if 'WIZ5XXSR' in self.curr_dev or self.curr_dev in W55RP20_FAMILY or 'W232N' in self.curr_dev or 'IP20' in self.curr_dev:
-                self.group_current_bank.hide()
-            else:
-                self.combobox_current_bank.setEnabled(False)
-        else:
-            if self.factory_setting_action is not None:
-                self.factory_setting_action.setEnabled(True)
-            if self.factory_firmware_action is not None:
-                self.factory_firmware_action.setEnabled(False)
-            self.ch1_ssl_tcpclient.setEnabled(False)
-            self.ch1_mqttclient.setEnabled(False)
-            self.ch1_mqtts_client.setEnabled(False)
-            self.group_current_bank.hide()
+        from device_spec_loader import load_device, detect_device
+        if not self.curr_dev:
+            return
+        spec_name = detect_device(self.curr_dev) or self.curr_dev
+        try:
+            spec = load_device(spec_name, self.curr_ver)
+        except FileNotFoundError:
+            self.logger.warning(f"_config_security_options: spec not found for {spec_name!r}")
+            return
 
+        # 이전 기준: curr_dev in SECURITY_DEVICE
+        is_security = spec.family in ("security", "security_two_port")
+
+        # tcp_timeout: 이전에는 SECURITY_DEVICE에서 setEnabled(True) 강제 호출
+        # 신규: _apply_serial_from_spec()에서 TR in search_cmd_list 기반으로 이미 처리 → 제거
+
+        # factory_setting: 항상 활성 (이전과 동일)
+        if self.factory_setting_action is not None:
+            self.factory_setting_action.setEnabled(True)
+        # factory_firmware: 이전 기준: SECURITY_DEVICE 여부 / 신규: spec.family 기반
+        if self.factory_firmware_action is not None:
+            self.factory_firmware_action.setEnabled(is_security)
+
+        # ssl/mqtt: 이전 기준: SECURITY_DEVICE 여부
+        # 신규: OP.values에 해당 인덱스 존재 여부 (결과 동일 — OP 4/5/6 보유 장치 = SECURITY_DEVICE)
+        op_entry = spec.cmdset.get('OP')
+        op_vals = op_entry.values if op_entry else {}
+        self.ch1_ssl_tcpclient.setEnabled('4' in op_vals)
+        self.ch1_mqttclient.setEnabled('5' in op_vals)
+        self.ch1_mqtts_client.setEnabled('6' in op_vals)
+
+        # group_current_bank: 이전 기준: SECURITY_DEVICE이면서 WIZ5XXSR/W55RP20/W232N/IP20 제외
+        # = 사실상 WIZ510SSL만 표시. 신규: widget_override visible: true (WIZ510SSL.yaml에만 선언)
+        wo_bank = spec.ui_config.widget_overrides.get('group_current_bank')
+        bank_visible = wo_bank.visible if (wo_bank and wo_bank.visible is not None) else False
+        self.group_current_bank.setVisible(bank_visible)
+        if bank_visible:
+            self.combobox_current_bank.setEnabled(False)
+
+        # ch2 ssl/mqtt: 항상 비활성 (이전과 동일)
         self.ch2_ssl_tcpclient.setEnabled(False)
         self.ch2_mqttclient.setEnabled(False)
         self.ch2_mqtts_client.setEnabled(False)
