@@ -1,23 +1,73 @@
-# IP20.yaml
-# W55RP20 칩 기반 단일 채널 장비 (W55RP20-S2E와 동일 커맨드셋)
+# WIZ5XXSR-RP.yaml
+# 보안 S2E 장비 (SSL/MQTT 지원)
+# 소스 기준: WIZMakeCMD.py SECURITY_DEVICE, cmd_security_base + cmd_wiz5xxsr_added
 
-name: IP20
-display_name: "IP20"
+name: WIZ5XXSR-RP
+display_name: "WIZ5XXSR-RP"
 aliases:
-  - "IP20"
+  - "WIZ5XXSR-RP"
 family: security
 channels: 1
+search_cmd_order:
+  - MC
+  - VR
+  - MN
+  - IM
+  - OP
+  - CP
+  - DG
+  - KA
+  - KI
+  - KE
+  - RI
+  - LI
+  - SM
+  - GW
+  - DS
+  - DH
+  - LP
+  - RP
+  - RH
+  - BR
+  - DB
+  - PR
+  - SB
+  - FL
+  - IT
+  - PT
+  - PS
+  - PD
+  - TE
+  - SS
+  - NP
+  - SP
+  - UN
+  - ST
+  - EC
+  - SC
+  - TR
+  - QU
+  - QP
+  - QC
+  - QK
+  - PU
+  - U0
+  - U1
+  - U2
+  - QO
+  - RC
+  - CE
+  - SO
+  - UF
 
 command_groups:
   - base
-  - retransmit
   - security
-  - w55rp20_ext
 
 overrides:
-  # BR: IP20 최대 921600 (index 0-15)
+  # BR: WIZ5XXSR-RP 최대 460800 (index 0-14)
   BR:
-    regex: "^([0-9]|1[0-5])$"
+    regex: "^([0-9]|1[0-4])$"
     values:
       "0": "300"
       "1": "600"
@@ -34,7 +84,7 @@ overrides:
       "12": "115200"
       "13": "230400"
       "14": "460800"
-      "15": "921600"
+  # SSL/MQTT 지원하는 OP 확장
   OP:
     regex: "^[0-6]$"
     values:
@@ -74,7 +124,6 @@ ui:
         - trigger
         - search_password
         - tcp_options
-        - connection_events
     - id: mqtt
       label: "MQTT"
       groups:
