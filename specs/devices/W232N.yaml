@@ -15,6 +15,9 @@ command_groups:
   - w55rp20_ext
 
 overrides:
+  # TR: FW 1.2.0 이상에서만 지원
+  TR:
+    min_version: "1.2.0"
   # BR: W232N 최대 230400 (index 0-13, WIZ750 브랜치와 동일)
   BR:
     regex: "^([0-9]|1[0-3])$"

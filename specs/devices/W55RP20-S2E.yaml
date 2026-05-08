@@ -89,10 +89,10 @@ overrides:
       "13": "230400"
       "14": "460800"
       "15": "921600"
-      "16": "1M"
-      "17": "2M"
-      "18": "4M"
-      "19": "8M"
+      "16": {value: "1M", min_version: "1.2.1"}
+      "17": {value: "2M", min_version: "1.2.1"}
+      "18": {value: "4M", min_version: "1.2.1"}
+      "19": {value: "8M", min_version: "1.2.1"}
   OP:
     regex: "^[0-6]$"
     values:
@@ -107,29 +107,6 @@ overrides:
 fw_constraints:
   upload_supported: true
   config_port: 50001
-  # BR index 0-15 fallback when FW < 1.2.1
-  version_specific:
-    - condition: "VR < 1.2.1"
-      overrides:
-        BR:
-          regex: "^([0-9]|1[0-5])$"
-          values:
-            "0": "300"
-            "1": "600"
-            "2": "1200"
-            "3": "1800"
-            "4": "2400"
-            "5": "4800"
-            "6": "9600"
-            "7": "14400"
-            "8": "19200"
-            "9": "28800"
-            "10": "38400"
-            "11": "57600"
-            "12": "115200"
-            "13": "230400"
-            "14": "460800"
-            "15": "921600"
 
 ui:
   tabs:

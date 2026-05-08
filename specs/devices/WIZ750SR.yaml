@@ -54,6 +54,9 @@ command_groups:
   - gpio
 
 overrides:
+  # TR: FW 1.2.0 이상에서만 지원
+  TR:
+    min_version: "1.2.0"
   # BR: WIZ750SR 최대 230400 (index 0-13)
   BR:
     regex: "^([0-9]|1[0-3])$"
