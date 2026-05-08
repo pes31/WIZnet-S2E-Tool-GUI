@@ -1,0 +1,88 @@
+# WIZ750SR-1xx.yaml
+# WIZ750SR-100, WIZ750SR-105, WIZ750SR-110, WIZ750SR-T1L 포함
+
+name: WIZ750SR-1xx
+display_name: "WIZ750SR-1xx"
+aliases:
+  - "WIZ750SR-1xx"
+  - "WIZ750SR-100"
+  - "WIZ750SR-105"
+  - "WIZ750SR-110"
+  - "WIZ750SR-T1L"
+family: one_port
+channels: 1
+search_cmd_order:
+  - MC
+  - VR
+  - MN
+  - UN
+  - ST
+  - IM
+  - OP
+  - CP
+  - DG
+  - KA
+  - KI
+  - KE
+  - RI
+  - LI
+  - SM
+  - GW
+  - DS
+  - LP
+  - RP
+  - RH
+  - BR
+  - DB
+  - PR
+  - SB
+  - FL
+  - IT
+  - PT
+  - PS
+  - PD
+  - TE
+  - SS
+  - NP
+  - SP
+  - SC
+  - TR
+  - S0
+  - S1
+
+command_groups:
+  - base
+  - retransmit
+  - gpio
+
+fw_constraints:
+  upload_supported: true
+  config_port: 50001
+
+ui:
+  tabs:
+    - id: network
+      label: "Network"
+      groups:
+        - device_info
+        - ip_mode
+        - op_mode
+        - conn_password
+    - id: serial
+      label: "Serial"
+      groups:
+        - serial_info
+        - serial_params
+        - data_packing
+    - id: options
+      label: "Options"
+      groups:
+        - inactivity
+        - keepalive
+        - trigger
+        - search_password
+        - tcp_options
+    - id: userio
+      label: "User I/O"
+      groups:
+        - gpio
