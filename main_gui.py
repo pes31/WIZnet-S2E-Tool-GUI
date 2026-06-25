@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 
 from wizsocket.TCPClient import TCPClient
 from WIZMakeCMD import (
@@ -2004,10 +2004,17 @@ class WIZWindow(QMainWindow, main_window):
                 try:
                     self.conf_sock.open()
                 except OSError as e:
-                    # selected_eth IP가 소멸(장치 재부팅/IP 변경 등)된 경우 INADDR_ANY로 재시도
-                    self.logger.warning(f"socket_config: bind({bind_ip!r}) 실패({e}) → INADDR_ANY로 재시도")
-                    self.conf_sock = WIZUDPSock(5000, 50001, "")
-                    self.conf_sock.open()
+                    self.logger.warning(
+                        f"socket_config: bind({bind_ip!r}:5000) failed ({e}) "
+                        "-> retry same interface with auto local port"
+                    )
+                    try:
+                        self.conf_sock = WIZUDPSock(5000, 50001, bind_ip, localport=0)
+                        self.conf_sock.open()
+                    except OSError as e2:
+                        self.logger.warning(f"socket_config: bind({bind_ip!r}:0) failed ({e2}) -> INADDR_ANY:auto")
+                        self.conf_sock = WIZUDPSock(5000, 50001, "", localport=0)
+                        self.conf_sock.open()
 
             # TCP unicast
             elif self.unicast_ip.isChecked():

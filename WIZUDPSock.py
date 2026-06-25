@@ -1,14 +1,14 @@
-#!/usr/bin/python
+﻿#!/usr/bin/python
 
 import socket
 
 
 class WIZUDPSock:
     # def __init__(self, port, peerport):
-    def __init__(self, port, peerport, ipaddr=None, localport=52000):
+    def __init__(self, port, peerport, ipaddr=None, localport=None):
         self.sock = None
         # self.localport = randint(52000, 53000)
-        self.localport = localport  # 0 = OS가 사용 가능한 포트 자동 할당
+        self.localport = port if localport is None else localport  # 0 = OS assigns an available port automatically
         self.peerport = peerport
         self.ipaddr = ipaddr
 
@@ -20,9 +20,14 @@ class WIZUDPSock:
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 524288)  # 512 KB
         # print('getsockopt SO_RCVBUF:', self.sock.getsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF))
 
-        # self.sock.bind(("", self.localport))
-        self.sock.bind((self.ipaddr, self.localport))
-        self.sock.setblocking(False)
+        try:
+            # self.sock.bind(("", self.localport))
+            self.sock.bind((self.ipaddr, self.localport))
+            self.sock.setblocking(False)
+        except OSError:
+            self.sock.close()
+            self.sock = None
+            raise
 
     def sendto(self, msg):
         assert self.sock is not None, "sendto() called before open()"
@@ -35,5 +40,6 @@ class WIZUDPSock:
         return data, addr
 
     def close(self):
-        assert self.sock is not None, "close() called before open()"
-        self.sock.close()
+        if self.sock is not None:
+            self.sock.close()
+            self.sock = None

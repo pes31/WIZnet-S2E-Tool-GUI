@@ -1,3 +1,68 @@
+# Fork Notes
+
+This fork exists to improve reliability when discovering WIZnet S2E devices on Windows systems where fixed UDP source ports may be blocked, reserved, or otherwise unavailable.
+
+The original tool tries to bind the UDP discovery socket to a fixed local port. On some Windows installations, that port can fail with errors such as:
+
+```text
+WinError 10013: An attempt was made to access a socket in a way forbidden by its access permissions
+```
+
+This fork keeps the normal behavior first, but adds safer fallbacks:
+
+- first try to bind on the selected network interface with the expected local port, for example `192.168.0.178:5000`
+- if that fails, retry on the same selected interface with an automatic local port, `localport=0`
+- if that also fails, retry with `INADDR_ANY` and an automatic local port
+
+This helps device discovery remain usable when Windows has reserved or blocked a port, while still preferring the network adapter selected in the GUI.
+
+## Quick Start
+
+### Install uv
+
+If `uv` is not installed, install it first:
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+Then close and reopen PowerShell.
+
+### Install Requirements and Run
+
+From the project directory:
+
+```powershell
+uv venv --python 3.12
+uv pip install -r requirements.txt
+uv run python main_gui.py
+```
+
+### Build the EXE
+
+From the project directory:
+
+```powershell
+uv venv --python 3.12
+uv pip install -r requirements.txt
+uv pip install pyinstaller
+.\build.ps1 -NoSign
+```
+
+You can also execute:
+
+```powershell
+.\build.bat
+```
+
+Build result:
+
+```text
+dist\wizconfig_s2e_tool_<version>.exe
+```
+
+---
+
 - [Configuration Tool Wiki](#configuration-tool-wiki)
 - [Overview](#overview)
   - [Support Devices](#support-devices)
@@ -151,5 +216,4 @@ If you have any problems, use one of the links below and **please report the pro
 - [WIZnet Developer Forum](https://forum.wiznet.io/)
 - [Github Issue page](https://github.com/Wiznet/WIZnet-S2E-Tool-GUI/issues)
 - [Discusstion](https://github.com/Wiznet/WIZnet-S2E-Tool-GUI/discussions)
-
 
